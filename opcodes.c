@@ -1361,7 +1361,7 @@ static uint8_t movx_a_indir_dptr(struct em8051 *aCPU)
 
 static uint8_t movx_a_indir_rx(struct em8051 *aCPU)
 {
-    uint16_t address = INDIR_RX_ADDRESS;
+    uint16_t address = ((uint16_t)aCPU->mSFR[REG_P2] << 8) | INDIR_RX_ADDRESS;
     if (aCPU->xread)
     {
         ACC = aCPU->xread(aCPU, address);
@@ -1425,7 +1425,7 @@ static uint8_t movx_indir_dptr_a(struct em8051 *aCPU)
 
 static uint8_t movx_indir_rx_a(struct em8051 *aCPU)
 {
-    uint16_t address = INDIR_RX_ADDRESS;
+    uint16_t address = ((uint16_t)aCPU->mSFR[REG_P2] << 8) | INDIR_RX_ADDRESS;
 
     if (aCPU->xwrite)
     {
