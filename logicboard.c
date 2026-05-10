@@ -66,7 +66,7 @@ static void closeaudio(void)
     fclose(audioout);
 }
 
-void logicboard_tick(struct em8051 *aCPU)
+void logicboard_tick_orig(struct em8051 *aCPU)
 {
     int i;
     if (logicmode == 2)
@@ -712,6 +712,7 @@ void logicboard_update(struct em8051 *aCPU)
         swstate[(data>>1)&1],
         swstate[(data>>0)&1]);
 
+    /*
     mvprintw(17, 2, "  ");
 
     attron(A_REVERSE);
@@ -749,6 +750,9 @@ void logicboard_update(struct em8051 *aCPU)
 		logicboard_render_chardisplay();
 		break;
     }
+    */
+
+    calibrator_board_render(aCPU);
 
     refresh();
 }

@@ -44,6 +44,7 @@
 #endif
 #include "emu8051.h"
 #include "emulator.h"
+#include "calibrator_board.h"
 
 unsigned char history[HISTORY_LINES * (128 + 64 + sizeof(int))];
 
@@ -295,6 +296,9 @@ int main(int parc, char ** pars)
     emu.sfrread[REG_P1] = emu_sfrread;
     emu.sfrread[REG_P2] = emu_sfrread;
     emu.sfrread[REG_P3] = emu_sfrread;
+
+    emu.xread = calibrator_xread;
+    emu.xwrite = calibrator_xwrite;
 
     reset(&emu, 1);
 
