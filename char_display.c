@@ -9,16 +9,12 @@
 
 extern int opt_clock_hz;
 
-FILE *file;
-
 int busy_37us = 37;
 
 void display_init(struct display_t *disp) {
     memset(disp, 0, sizeof(struct display_t));
     disp->dir = 1;
     disp->dcb = 7;
-
-    file = fopen("output.txt", "w");
 
     busy_37us = 37 * opt_clock_hz / 12000000;
 }
@@ -41,9 +37,6 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
     {
         // Read op
         // - E level rises from low to high on read ops			
-
-        fprintf (file, "disp read %x\n", control);
-        fflush(file);
 
         if (control & 0x40)
         {   // P3.6
@@ -106,9 +99,6 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
         // Write op
         // - E level drops from high to low on write ops
 
-        fprintf (file, "disp write %x %x\n", control, data);
-        fflush(file);
-
         if (disp->_4bmode == 0)
         {
             disp->data = data;
@@ -152,16 +142,12 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                         disp->busy = busy_37us;
                     }
                 }
-                else {
-                    fprintf (file, "disp busy = %d\n", disp->busy);
-                }
             }
             else
             {
                 // instruction mode				
                 if (disp->busy)
                 {
-                    fprintf (file, "disp busy = %d\n", disp->busy);
                 }
                 else
                 if (disp->data == 1)
