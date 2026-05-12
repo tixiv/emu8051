@@ -26,6 +26,9 @@
  * Emulator core header file
  */
 
+#ifndef EMU8051_H
+#define EMU8051_H
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -260,3 +263,4 @@ enum EM8051_EXCEPTION
     EXCEPTION_ILLEGAL_OPCODE     // for the single 'reserved' opcode in the architecture
 };
 
+#endif

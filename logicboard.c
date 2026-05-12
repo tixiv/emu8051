@@ -32,6 +32,7 @@
 #include "curses.h"
 #include "emu8051.h"
 #include "emulator.h"
+#include "calibrator_board.h"
 
 static int position;
 static int logicmode = 0;
@@ -422,7 +423,7 @@ void logicboard_tick_orig(struct em8051 *aCPU)
     oldports[2] = aCPU->mSFR[REG_P2];
     oldports[3] = aCPU->mSFR[REG_P3];
 }
-
+#if 0
 static void logicboard_render_7segs(struct em8051 *aCPU)
 {
     int input1 = aCPU->mSFR[REG_P0];
@@ -485,6 +486,8 @@ static void logicboard_render_chardisplay()
 	mvprintw(12, 40, "P3.6   = RS");
 	mvprintw(13, 40, "P3.5   = RW");
 }
+#endif
+
 
 static void logicboard_entermode()
 {

@@ -9,11 +9,20 @@
 
 extern int opt_clock_hz;
 
+FILE *file;
+
+int busy_37us = 37;
+
 void display_init(struct display_t *disp) {
     memset(disp, 0, sizeof(struct display_t));
     disp->dir = 1;
     disp->dcb = 7;
+
+    file = fopen("output.txt", "w");
+
+    busy_37us = 37 * opt_clock_hz / 12000000;
 }
+
 
 // Takes data and control line states, returns data state for reads
 // control.7 = EN
@@ -33,6 +42,8 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
         // Read op
         // - E level rises from low to high on read ops			
 
+        fprintf (file, "disp read %x\n", control);
+        fflush(file);
 
         if (control & 0x40)
         {   // P3.6
@@ -50,8 +61,7 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                         disp->cp += disp->dir; 
                         if (disp->shift)
                             disp->ofs += disp->dir;
-                        // busy for 250 microseconds
-                        disp->busy = 250*opt_clock_hz / 12000000;
+                        disp->busy = busy_37us;
                     }
                 }
                 else
@@ -61,8 +71,7 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                     if (!disp->_4bmode || disp->tick)
                     {
                         disp->cp++; // assumed; not clear from data sheet
-                        // busy for 250 microseconds
-                        disp->busy = 250*opt_clock_hz / 12000000;
+                        disp->busy = busy_37us;
                     }
                 }
             }
@@ -96,7 +105,10 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
     {	// P3.7
         // Write op
         // - E level drops from high to low on write ops
-        
+
+        fprintf (file, "disp write %x %x\n", control, data);
+        fflush(file);
+
         if (disp->_4bmode == 0)
         {
             disp->data = data;
@@ -117,7 +129,7 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
         if (!disp->tick || !disp->_4bmode)
         {
             if (control & 0x40)
-            { // P3.6
+            {
                 if (!disp->busy)
                 {
                     // memory IO mode
@@ -129,7 +141,7 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                         if (disp->shift)
                             disp->ofs += disp->dir;
                         // busy for 250 microseconds
-                        disp->busy = 250*opt_clock_hz / 12000000;
+                        disp->busy = busy_37us;
                     }
                     else
                     {
@@ -137,8 +149,11 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                         disp->cgram[disp->cp & 0x3f] = disp->data;
                         disp->cp++;  // assumed: not clear from data sheet
                         // busy for 250 microseconds
-                        disp->busy = 250*opt_clock_hz / 12000000;
+                        disp->busy = busy_37us;
                     }
+                }
+                else {
+                    fprintf (file, "disp busy = %d\n", disp->busy);
                 }
             }
             else
@@ -146,7 +161,7 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                 // instruction mode				
                 if (disp->busy)
                 {
-                    // if busy, only let the user read the busy state.
+                    fprintf (file, "disp busy = %d\n", disp->busy);
                 }
                 else
                 if (disp->data == 1)
@@ -166,8 +181,7 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                     // return home
                     disp->cp = 0;
                     disp->ofs = 0;
-                    // busy for 200 microseconds
-                    disp->busy = 200*opt_clock_hz / 12000000;
+                    disp->busy = busy_37us;
                 }
                 else
                 if ((disp->data & (0xff & ~3)) == 4)
@@ -181,16 +195,14 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                         disp->dir = 1;
                     else
                         disp->dir = -1;
-                    // busy for 200 microseconds
-                    disp->busy = 200*opt_clock_hz / 12000000;
+                    disp->busy = busy_37us;
                 }
                 else
                 if ((disp->data & (0xff & ~7)) == 8)
                 {
                     // display on/off setting.
                     disp->dcb = disp->data & 0x7;
-                    // busy for 200 microseconds
-                    disp->busy = 200*opt_clock_hz / 12000000;
+                    disp->busy = busy_37us;
                 }
                 else
                 if ((disp->data & (0xff & ~0xf)) == 0x10)
@@ -212,8 +224,7 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                         else
                             disp->ofs--;
                     }
-                    // busy for 200 microseconds
-                    disp->busy = 200*opt_clock_hz / 12000000;
+                    disp->busy = busy_37us;
                 }
                 else
                 if ((disp->data & (0xff & ~0x1f)) == 0x20)
@@ -221,16 +232,14 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                     // function set (4/8 bit interface, font size). 
                     disp->_4bmode = (disp->data & 16) == 0;
                     disp->tick = 0;
-                    // busy for 200 microseconds
-                    disp->busy = 200*opt_clock_hz / 12000000;
+                    disp->busy = busy_37us;
                 }
                 else
                 if ((disp->data & (0xff & ~0x3f)) == 0x40)
                 {
                     // character gen address set. 
                     disp->chargen = 1;
-                    // busy for 200 microseconds
-                    disp->busy = 200*opt_clock_hz / 12000000;
+                    disp->busy = busy_37us;
                 }
                 else
                 if ((disp->data & (0xff & ~0x7f)) == 0x80)
@@ -238,8 +247,7 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
                     // cursor position address set
                     disp->cp = disp->data & 0x7f;
                     disp->chargen = 0;
-                    // busy for 200 microseconds
-                    disp->busy = 200*opt_clock_hz / 12000000;
+                    disp->busy = busy_37us;
                 }
             }
         }
@@ -285,8 +293,5 @@ void display_render(struct display_t *disp)
 	mvprintw(5, 40, "Blinking %3s, 4bit %3s", (disp->dcb & 1)?"on":"off", (disp->_4bmode & 1)?"on":"off");
 	mvprintw(6, 40, "4b tick:%d Busy:%-7d", disp->tick, disp->busy);
 
-	mvprintw(10, 40, "P1.0-7 = DB0-7");
-	mvprintw(11, 40, "P3.7   = EN");
-	mvprintw(12, 40, "P3.6   = RS");
-	mvprintw(13, 40, "P3.5   = RW");
+	
 }
