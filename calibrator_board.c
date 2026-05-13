@@ -17,6 +17,11 @@ typedef struct {
 } io_board_t;
 
 void io_board_tick (io_board_t* iob, float integrator_voltage, uint8_t range){
+    // Ranges:
+    //       M*10 Val GND Batt Temp  Sel Ctrl/10
+    // 0x5f    1   0   1    1    1    1    1      -> Source 20mA
+    // 0x1e    0   0   1    1    1    1    0      -> Source 52mA
+
     float measure_mult = (range & 0x40) ? 10.0f : 1.0f;
     float control_mult = (range & 0x01) ? .02f : .2f;
     
@@ -42,10 +47,15 @@ struct calibrator_board_t {
     plot_t plot;
     
     uint8_t display_data;
-    uint8_t display_ctrl;
 
-    uint8_t range;
+    uint8_t reg_9000;
+    uint8_t reg_9002;
 
+    char new_key;
+    char current_key;
+    int key_timer;
+
+    uint8_t keys_out;
 };
 
 static struct calibrator_board_t the_board, *board = &the_board;
@@ -58,9 +68,56 @@ void calibrator_board_init () {
 }
 
 
+void keyboard_update() {
+    if (board->new_key > 0) {
+        board->current_key = board->new_key;
+        board->new_key = 0;
+        board->key_timer = 100000;
+    }
+
+    if (board->key_timer) {
+        board->key_timer--;
+    }
+    else
+    {
+        board->current_key = 0;
+    }
+
+    uint8_t keys_out = 0xff;
+
+    if (board->current_key > 0) {
+        if ((board->reg_9000 & 0x80) == 0) {
+            switch (board->current_key) {
+                case '7':   keys_out &= (uint8_t)~0x80; break;
+                case '8':   keys_out &= (uint8_t)~0x20; break;
+                case '9':   keys_out &= (uint8_t)~0x08; break;
+                case '\n':  keys_out &= (uint8_t)~0x02; break;
+                case '4':   keys_out &= (uint8_t)~0x40; break;
+                case '5':   keys_out &= (uint8_t)~0x10; break;
+                case '6':   keys_out &= (uint8_t)~0x04; break;
+                case '/':   keys_out &= (uint8_t)~0x01; break;
+            }
+        }
+        if ((board->reg_9002 & 0x08) == 0) {
+            switch (board->current_key) {
+                case '1':   keys_out &= (uint8_t)~0x80; break;
+                case '2':   keys_out &= (uint8_t)~0x20; break;
+                case '3':   keys_out &= (uint8_t)~0x08; break;
+                case 'm':   keys_out &= (uint8_t)~0x02; break;
+                case '#':   keys_out &= (uint8_t)~0x40; break;
+                case '0':   keys_out &= (uint8_t)~0x10; break;
+                case ',':   keys_out &= (uint8_t)~0x04; break;
+                case '*':   keys_out &= (uint8_t)~0x01; break;
+            }
+        }
+    }
+
+    board->keys_out = keys_out;
+}
+
 void logicboard_tick(struct em8051 *aCPU)
 {
-    uint8_t c = board->display_ctrl;
+    uint8_t c = board->reg_9002;
     uint8_t ctrl = ((c & 0x01) ? 0x80 : 0) | // EN
                    ((c & 0x02) ? 0x20 : 0) | // R/W
                    ((c & 0x04) ? 0x40 : 0);  // RS
@@ -70,17 +127,23 @@ void logicboard_tick(struct em8051 *aCPU)
     integrator_tick(&board->integrator, aCPU);
     float akk = board->integrator.akk;
 
-    io_board_tick(&board->io_board, akk, board->range);
+    io_board_tick(&board->io_board, akk, board->reg_9000);
     float measure_value = board->io_board.measure_voltage;
     //float measure_value = akk / 5.0f;
 
-    double noise = ((double)rand() / RAND_MAX - 0.5) * 0.0005f;
+    double noise = ((double)rand() / RAND_MAX - 0.5) * 0.0002f;
 
     measure_value += noise;
 
-    multimeter_tick(aCPU, &board->multimeter, measure_value);
+    // The meter uses a 1.1V reference instead of 1V, so the numbers
+    // are going to be off, but that's normal for this device.
+    // Probably this decision is due to the 20mA range
+    multimeter_tick(aCPU, &board->multimeter, measure_value / 1.1f);
+
+    keyboard_update();
 
     plot_update(&board->plot, measure_value);
+
 }
 
 uint8_t xram[0x8000];
@@ -95,9 +158,11 @@ uint8_t calibrator_xread (struct em8051 *aCPU, uint16_t address)
     case 0x8000:
         aCPU->mSFR[REG_TCON] &= ~TCONMASK_IE1;
         return board->multimeter.dat_8000;
+    
+    case 0x8001: return board->keys_out;
 
-    case 0x9000: return board->range;
-    case 0x9002: return board->display_ctrl;
+    case 0x9000: return board->reg_9000;
+    case 0x9002: return board->reg_9002;
     }
 
     return 0xff;
@@ -110,11 +175,20 @@ void calibrator_xwrite (struct em8051 *aCPU, uint16_t address, uint8_t value)
         return;
     }
 
-        switch (address) {
-        case 0x9000: board->range = value; break;
+    switch (address) {
+        case 0x9000: board->reg_9000 = value; break;
         case 0x9001: board->display_data = value; break;
-        case 0x9002: board->display_ctrl = value; break;
+        case 0x9002: board->reg_9002 = value; break;
+        case 0x9003:
+            if ((value & 0x80) == 0) {
+                // bit mod PORTC
+                int bit_num = ((value & 0x0e) >> 1);
 
+                if (value & 0x01)
+                    board->reg_9002 |= (1 << bit_num);
+                else
+                    board->reg_9002 &= ~(1 << bit_num);
+            }
     }
 }
 
@@ -146,6 +220,12 @@ void calibrator_board_render (struct em8051 *aCPU)
     mvprintw(17, 40, "last = %02x", board->integrator.last_pulse_value);
     mvprintw(18, 40, "pc = %04x", board->integrator.written_from);
 
-    mvprintw(18, 0, "range = %02x", board->range & 0x7f);
+    mvprintw(18, 0, "range = %02x", board->reg_9000 & 0x7f);
 
+    mvprintw(19, 0, "key = '%c' = %02x  ", (board->current_key > 0 ? board->current_key : '^'), board->current_key);
+    mvprintw(20, 0, "key_timer = '%d'  ", board->key_timer);
+}
+
+void logicboard_editor_keys(struct em8051 *aCPU, int ch) {
+    board->new_key = ch;
 }

@@ -543,7 +543,7 @@ void build_logicboard_view(struct em8051 *aCPU)
 }
 
 
-void logicboard_editor_keys(struct em8051 *aCPU, int ch)
+void logicboard_editor_keys_old(struct em8051 *aCPU, int ch)
 {
     int xorvalue = -1;
     switch (ch)

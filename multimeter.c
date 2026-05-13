@@ -15,6 +15,7 @@ void multimeter_tick(struct em8051 *aCPU, multimeter_t *meter, float value) {
     if (meter->measure_cycle_delay == 0)
     {
         {
+            // 2V full range
             int v = (value * 10000.0f) + 0.5f;
 
             bool plus = value > 0.0f;
