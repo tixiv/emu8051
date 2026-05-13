@@ -432,6 +432,10 @@ int main(int parc, char ** pars)
         }
     }
 
+    {
+        // emu.mCodeMem[0x666] = 10;
+    }
+
     //  Initialize ncurses
 
     slk_init(1);

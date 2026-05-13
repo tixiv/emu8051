@@ -26,12 +26,19 @@ void multimeter_tick(struct em8051 *aCPU, multimeter_t *meter, float value) {
 
             bool ur = v <= 1800; 
 
-
-            meter->digits[0] = 0x30 | (v >= 10000 ? 1:0) | (plus ? 8:0) | (ov ? 4:0) | (ur ? 2:0);
-            meter->digits[1] = 0x30 + (v / 1000) % 10;
-            meter->digits[2] = 0x30 + (v / 100) % 10;
-            meter->digits[3] = 0x30 + (v / 10) % 10;
-            meter->digits[4] = 0x30 + v % 10;
+            if (!ov) {
+                meter->digits[0] = 0x30 | (v >= 10000 ? 1:0) | (plus ? 8:0) | (ov ? 4:0) | (ur ? 2:0);
+                meter->digits[1] = 0x30 + (v / 1000) % 10;
+                meter->digits[2] = 0x30 + (v / 100) % 10;
+                meter->digits[3] = 0x30 + (v / 10) % 10;
+                meter->digits[4] = 0x30 + v % 10;
+            } else {
+                meter->digits[0] = 0x30 | (plus ? 8:0) | (ov ? 4:0);
+                meter->digits[1] = 0x30;
+                meter->digits[2] = 0x30;
+                meter->digits[3] = 0x30;
+                meter->digits[4] = 0x30;
+            }
         }
 
         meter->measure_cycle_delay = 87000;
