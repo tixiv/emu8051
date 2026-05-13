@@ -3,7 +3,7 @@
 #####################################################################
 BIN := emu
 
-CFLAGS += -O2
+CFLAGS += -Og
 CFLAGS += -pipe
 CFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wshadow
 

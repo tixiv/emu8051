@@ -1,5 +1,6 @@
 
 #include "char_display.h"
+#include "integrator.h"
 #include "multimeter.h"
 #include "plot.h"
 #include "emu8051.h"
@@ -11,6 +12,7 @@
 struct calibrator_board_t {
     struct display_t display;
     multimeter_t multimeter;
+    integrator_t integrator;
     plot_t plot;
     
     uint8_t display_data;
@@ -23,6 +25,7 @@ void calibrator_board_init () {
     display_init(&board->display);
     multimeter_init(&board->multimeter);
     plot_init(&board->plot);
+    integrator_init(&board->integrator);
 }
 
 static float v = -0.01f;
@@ -36,11 +39,17 @@ void logicboard_tick(struct em8051 *aCPU)
 
     display_tick(&board->display, board->display_data, ctrl);
 
-    multimeter_tick(aCPU, &board->multimeter, v);
+    integrator_tick(&board->integrator, aCPU);
 
-    plot_update(&board->plot, v);
+    float akk = board->integrator.akk;
 
-    {
+    float measure_value = akk / 5.0f;
+
+    multimeter_tick(aCPU, &board->multimeter, measure_value);
+
+    plot_update(&board->plot, measure_value);
+
+    if(1){
         static int delay;
         if ((delay++ & 0xfffff) == 0)
             v += 0.0001f;
@@ -86,5 +95,9 @@ void calibrator_board_render (struct em8051 *aCPU)
     mvprintw(10, 40, "XRAM 70 = %x", xram[0x70]);
     mvprintw(11, 40, "XRAM 71 = %x", xram[0x71]);
     mvprintw(12, 40, "XRAM A0 = %s", &xram[0xa0]);
-    
+
+    mvprintw(14, 40, "PORT1 = %x", aCPU->mSFR[REG_P1]);
+    mvprintw(15, 40, "inte = %g", board->integrator.akk);
+    mvprintw(16, 40, "last = %x", board->integrator.last_pulse_value);
+    mvprintw(17, 40, "pc = %x", board->integrator.written_from);
 }

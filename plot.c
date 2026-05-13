@@ -5,10 +5,11 @@
 void plot_init(plot_t * plot){
     memset(plot, 0, sizeof(plot_t));
 
-    plot->gp = popen("gnuplot -persistent", "w");
+    //plot->gp = popen("gnuplot -persistent", "w");
+    plot->gp = popen("gnuplot", "w");
 
-    fprintf(plot->gp, "set yrange [-0.1:0.1]\n");
-    fprintf(plot->gp, "set y2range [0:1000]\n");
+    fprintf(plot->gp, "set yrange [-1:1]\n");
+    //fprintf(plot->gp, "set y2range [0:1000]\n");
 }
 
 void plot_update(plot_t *plot, double value) {
