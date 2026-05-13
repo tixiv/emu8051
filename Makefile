@@ -11,6 +11,7 @@ CFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wshadow
 #CFLAGS += -flto
 
 LDLIBS += -lcurses
+LDLIBS += -lm
 
 #####################################################################
 # Rules

@@ -300,6 +300,8 @@ int main(int parc, char ** pars)
     emu.xread = calibrator_xread;
     emu.xwrite = calibrator_xwrite;
 
+    calibrator_board_init();
+
     reset(&emu, 1);
 
     if (parc > 1)
