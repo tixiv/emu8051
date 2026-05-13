@@ -41,5 +41,11 @@ void integrator_tick(integrator_t *integrator, struct em8051 *aCPU) {
         }
     }
 
+    // float error_current = -0.000000036f;
+    // integrator->akk += error_current / capacitor;
+
+    if (integrator->akk > 16.5f) integrator->akk = 16.5f;
+    if (integrator->akk < -6.5f) integrator->akk = -6.5f;
+
     integrator->last_port = port1;
 }

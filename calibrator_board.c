@@ -7,16 +7,45 @@
 #include "curses.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
+
+typedef struct {
+    float control_voltage;
+    float measure_voltage;
+
+} io_board_t;
+
+void io_board_tick (io_board_t* iob, float integrator_voltage, uint8_t range){
+    float measure_mult = (range & 0x40) ? 10.0f : 1.0f;
+    float control_mult = (range & 0x01) ? .02f : .2f;
+    
+    iob->control_voltage = integrator_voltage * control_mult;
+
+    float mv = iob->control_voltage;
+    switch ((~range) & 0x3C) {
+        case 0: mv = iob->control_voltage; break;
+        case 0x04: mv = 17.4 * 0.01; break; // temperature
+        case 0x08: mv = 5.26 * 0.01; break; // battery
+        case 0x10: mv = 0.0f; break; // GND
+        case 0x20: mv = iob->control_voltage; break;// measure, not reverse engineered yet
+    }
+
+    iob->measure_voltage = mv * measure_mult;
+}
 
 struct calibrator_board_t {
     struct display_t display;
     multimeter_t multimeter;
     integrator_t integrator;
+    io_board_t io_board;
     plot_t plot;
     
     uint8_t display_data;
     uint8_t display_ctrl;
+
+    uint8_t range;
+
 };
 
 static struct calibrator_board_t the_board, *board = &the_board;
@@ -28,7 +57,6 @@ void calibrator_board_init () {
     integrator_init(&board->integrator);
 }
 
-static float v = -0.01f;
 
 void logicboard_tick(struct em8051 *aCPU)
 {
@@ -40,20 +68,19 @@ void logicboard_tick(struct em8051 *aCPU)
     display_tick(&board->display, board->display_data, ctrl);
 
     integrator_tick(&board->integrator, aCPU);
-
     float akk = board->integrator.akk;
 
-    float measure_value = akk / 5.0f;
+    io_board_tick(&board->io_board, akk, board->range);
+    float measure_value = board->io_board.measure_voltage * 10.0f;
+    // float measure_value = akk / 5.0f;
+
+    double noise = ((double)rand() / RAND_MAX - 0.5) * 0.0005f;
+
+    measure_value += noise;
 
     multimeter_tick(aCPU, &board->multimeter, measure_value);
 
     plot_update(&board->plot, measure_value);
-
-    if(1){
-        static int delay;
-        if ((delay++ & 0xfffff) == 0)
-            v += 0.0001f;
-    }
 }
 
 uint8_t xram[0x8000];
@@ -69,6 +96,7 @@ uint8_t calibrator_xread (struct em8051 *aCPU, uint16_t address)
         aCPU->mSFR[REG_TCON] &= ~TCONMASK_IE1;
         return board->multimeter.dat_8000;
 
+    case 0x9000: return board->range;
     case 0x9002: return board->display_ctrl;
     }
 
@@ -83,8 +111,10 @@ void calibrator_xwrite (struct em8051 *aCPU, uint16_t address, uint8_t value)
     }
 
         switch (address) {
+        case 0x9000: board->range = value; break;
         case 0x9001: board->display_data = value; break;
         case 0x9002: board->display_ctrl = value; break;
+
     }
 }
 
@@ -96,8 +126,11 @@ void calibrator_board_render (struct em8051 *aCPU)
     mvprintw(11, 40, "XRAM 71 = %x", xram[0x71]);
     mvprintw(12, 40, "XRAM A0 = %s", &xram[0xa0]);
 
-    mvprintw(14, 40, "PORT1 = %x", aCPU->mSFR[REG_P1]);
-    mvprintw(15, 40, "inte = %g", board->integrator.akk);
-    mvprintw(16, 40, "last = %x", board->integrator.last_pulse_value);
-    mvprintw(17, 40, "pc = %x", board->integrator.written_from);
+    mvprintw(14, 40, "PORT1 = %02x", aCPU->mSFR[REG_P1]);
+    mvprintw(15, 40, "inte = %g      ", board->integrator.akk);
+    mvprintw(16, 40, "last = %02x", board->integrator.last_pulse_value);
+    mvprintw(17, 40, "pc = %04x", board->integrator.written_from);
+
+    mvprintw(18, 0, "range = %02x", board->range);
+
 }
