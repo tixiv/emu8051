@@ -13,6 +13,7 @@
 #include <string.h>
 
 extern unsigned int clocks;
+extern int opt_clock_hz;
 
 typedef struct {
     float control_voltage;
@@ -166,9 +167,9 @@ void logicboard_tick(struct em8051 *aCPU) {
     float measure_value = board->io_board.measure_voltage;
     // float measure_value = akk / 5.0f;
 
-    double noise = ((double)rand() / RAND_MAX - 0.5) * 0.0002f;
+    double noise = ((double)rand() / RAND_MAX - 0.5) * 0.0001f;
 
-    // measure_value += noise;
+    measure_value += noise;
 
     // The meter uses a 1.1V reference instead of 1V, so the numbers
     // are going to be off, but that's normal for this device.
@@ -268,41 +269,69 @@ void calibrator_board_render(struct em8051 *aCPU) {
     mvprintw(21, 0, "mode = '%x'  ", board->mode);
 }
 
+void trace_raw(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(board->logfile, fmt, ap);
+    va_end(ap);
+}
+
+void trace_msg(const char *fmt, ...) {
+    va_list ap;
+    
+    uint64_t us_total = 1000000ull * clocks / opt_clock_hz;
+    
+    int us = us_total % 1000000;
+    int s = (us_total / 1000000) % 60;
+    int m = us_total / 1000000 / 60;
+
+    fprintf(board->logfile, "[%02d:%02d.%06d] ", m, s, us);
+
+    va_start(ap, fmt);
+    vfprintf(board->logfile, fmt, ap);
+    va_end(ap);
+    fflush(board->logfile);
+}
+
+void trace_flush() {
+    fflush(board->logfile);
+}
+
 uint8_t xram_copy[32768];
 
 void snapshot(struct em8051 *aCPU) {
     memcpy(xram_copy, xram, sizeof(xram_copy));
     memset(write_map, 0, sizeof(write_map));
     memset(read_map, 0, sizeof(read_map));
-    fprintf(board->logfile, "Snapshot taken at PC: %04x, Time: %14.3f ms\n",
+    trace_msg("Snapshot taken at PC: %04x, Time: %14.3f ms\n",
             aCPU->mPC, clocks / 1000.0f);
-    fflush(board->logfile);
+    
 }
 
 void hexdump(uint8_t *data, int len) {
     for (int i = 0; i < len; i++) {
-        fprintf(board->logfile, "%02X ", data[i]);
+        trace_raw("%02X ", data[i]);
     }
 
-    fprintf(board->logfile, " | ");
+    trace_raw(" | ");
 
     for (int i = 0; i < len; i++) {
-        fprintf(board->logfile, "%c", isprint(data[i]) ? data[i] : '.');
+        trace_raw("%c", isprint(data[i]) ? data[i] : '.');
     }
 
     if (len == 4) {
-        fprintf(board->logfile, " | %f", (double)*(float *)data);
+        trace_raw(" | %f", (double)*(float *)data);
     }
 
-    fprintf(board->logfile, "\n");
+    trace_raw("\n");
 }
 
 void print_diff(int diff_start, int diff_end, const char *desc) {
     int size = diff_end - diff_start;
-    fprintf(board->logfile, "---- %s at %04x size %02x -----\n", desc, diff_start, size);
-    fprintf(board->logfile, "from: ");
+    trace_raw("---- %s at %04x size %02x -----\n", desc, diff_start, size);
+    trace_raw("from: ");
     hexdump(&xram_copy[diff_start], size);
-    fprintf(board->logfile, "to:   ");
+    trace_raw("to:   ");
     hexdump(&xram[diff_start], size);
 }
 
@@ -326,12 +355,12 @@ void find_chains(uint8_t *map, const char *desc) {
 }
 
 void diff(struct em8051 *aCPU) {
-    fprintf(board->logfile, "Diff at PC: %04x, Time: %14.3f ms\n", aCPU->mPC,
+    trace_msg("Diff at PC: %04x, Time: %14.3f ms\n", aCPU->mPC,
             clocks / 1000.0f);
     find_chains(read_map, "Reads");
     find_chains(write_map, "Writes");
 
-    fflush(board->logfile);
+    trace_flush();
 }
 
 void logicboard_editor_keys(struct em8051 *aCPU, int ch) {
@@ -387,35 +416,30 @@ void trace_multimeter_read(struct em8051 *aCPU) {
     if (caller == 0x679) // Don't trcae calls from read and convert
         return;
 
-    fprintf(board->logfile, "Multimeter read from %04x '%s' range %02x\n",
+    trace_msg("Multimeter read from %04x '%s' range %02x\n",
             caller, &xram[0xa0], board->reg_9000 & 0x7f);
-    fflush(board->logfile);
 }
 
 void trace_multimeter_read_and_convert(struct em8051 *aCPU) {
 
-    fprintf(board->logfile, "Multimeter read and convert from %04x %f range %02x\n",
+    trace_msg("Multimeter read and convert from %04x %f range %02x\n",
             get_caller(aCPU), *(float *)&xram[0x187c], board->reg_9000 & 0x7f);
-    fflush(board->logfile);
 }
 
 void trace_extmem_70() {
-    fprintf(board->logfile, "Extmem 70 = %02x %02x\n", xram[0x70], xram[0x71]);
-    fflush(board->logfile);
+    trace_msg("Extmem 70 = %02x %02x\n", xram[0x70], xram[0x71]);
 }
 
 void trace_3f_pointer(struct em8051 *aCPU) {
     uint16_t p = aCPU->mLowerData[0x3f] << 8 | aCPU->mLowerData[0x40];
     float v = *(float *)&xram[p];
 
-    fprintf(board->logfile, "trace math op - fac = %f, argument = %f\n", read_fac(aCPU), v);
-    fflush(board->logfile);
+    trace_msg("trace math op - fac = %f, argument = %f\n", read_fac(aCPU), v);
 }
 
 void trace_fun762(struct em8051 *aCPU) {
     uint16_t caller = get_caller(aCPU);
-    fprintf(board->logfile, "fun762 from %04x\n", caller);
-    fflush(board->logfile);
+    trace_msg("fun762 from %04x\n", caller);
 }
 
 void trace_pc(struct em8051 *aCPU) {

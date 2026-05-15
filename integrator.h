@@ -9,6 +9,7 @@ typedef struct {
     uint8_t last_port;
     uint8_t last_pulse_value;
     uint16_t written_from;
+    int last_clocks;
 } integrator_t;
 
 void integrator_init (integrator_t *integrator);
