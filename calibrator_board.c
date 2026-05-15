@@ -447,5 +447,9 @@ void trace_pc(struct em8051 *aCPU) {
         case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
         case 0xe00a: trace_math_op(aCPU); break;
         case 0x07c5: trace_fun762(aCPU); break;
+        case 0xdb82: trace_msg("Enable interrupt to read meter\n"); break;
+        case 0x17e2: trace_msg("ISR Quatsch loop begin\n"); break;
+        case 0x1812: trace_msg("ISR Quatsch loop end\n"); break;
+        case 0x182e: trace_msg("ISR Read digit %02x\n", aCPU->mSFR[REG_ACC]); break;
     }
 }
