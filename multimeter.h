@@ -6,10 +6,9 @@
 #include "emu8051.h"
 
 typedef struct {
-    int measure_cycle_delay;
+    int measure_cycle;
     int data_cycle_delay;
     int data_count;
-    int cycle;
     uint8_t dat_8000;
 
     uint8_t digits[5];
