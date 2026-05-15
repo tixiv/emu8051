@@ -426,15 +426,12 @@ void trace_multimeter_read_and_convert(struct em8051 *aCPU) {
             get_caller(aCPU), *(float *)&xram[0x187c], board->reg_9000 & 0x7f);
 }
 
-void trace_extmem_70() {
-    trace_msg("Extmem 70 = %02x %02x\n", xram[0x70], xram[0x71]);
-}
-
-void trace_3f_pointer(struct em8051 *aCPU) {
+void trace_math_op(struct em8051 *aCPU) {
     uint16_t p = aCPU->mLowerData[0x3f] << 8 | aCPU->mLowerData[0x40];
     float v = *(float *)&xram[p];
 
-    trace_msg("trace math op - fac = %f, argument = %f\n", read_fac(aCPU), v);
+    trace_msg("trace math op from %4x fac = %f, argument = %f, result = %2x %2x\n",
+        get_caller(aCPU), read_fac(aCPU), v, xram[0x70], xram[0x71]);
 }
 
 void trace_fun762(struct em8051 *aCPU) {
@@ -448,9 +445,7 @@ void trace_pc(struct em8051 *aCPU) {
     switch (pc) {
         case 0xddca: trace_multimeter_read(aCPU); break;
         case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
-        // case 0x785:  trace_extmem_70(); break;
-        case 0xdffd: trace_3f_pointer(aCPU); break;
-        case 0xe00a: trace_extmem_70(); break;
+        case 0xe00a: trace_math_op(aCPU); break;
         case 0x07c5: trace_fun762(aCPU); break;
     }
 }
