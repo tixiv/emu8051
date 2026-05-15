@@ -116,6 +116,8 @@ void emu_exception(struct em8051 *aCPU, int aCode)
     {
     case -1: waddstr(exc,"Breakpoint reached");
              break;
+    case -2: waddstr(exc,"Watchpoint hit");
+             break;
     case EXCEPTION_STACK: waddstr(exc,"SP exception: stack address > 127");
                           wmove(exc, 3, 2);
                           waddstr(exc,"with no upper memory, or SP roll over."); 

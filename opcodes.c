@@ -800,9 +800,12 @@ static uint8_t anl_c_bitaddr(struct em8051 *aCPU)
     return 0;
 }
 
+extern void watch_codemem_access (uint16_t);
+
 static uint8_t movc_a_indir_a_pc(struct em8051 *aCPU)
 {
     uint16_t address = PC + 1 + ACC;
+    watch_codemem_access(address);
     ACC = CODEMEM(address);
     PC++;
     return 0;
@@ -890,6 +893,7 @@ static uint8_t mov_bitaddr_c(struct em8051 *aCPU)
 static uint8_t movc_a_indir_a_dptr(struct em8051 *aCPU)
 {
     uint16_t address = DPTR + ACC;
+    watch_codemem_access(address);
     ACC = CODEMEM(address);
     PC++;
     return 1;

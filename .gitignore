@@ -20,3 +20,11 @@ emu
 .\#*
 *~
 ~*
+
+#hex files
+*.hex
+
+compile_commands.json
+.cache
+.vscode
+log

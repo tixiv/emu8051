@@ -8,7 +8,7 @@ void plot_init(plot_t * plot){
     //plot->gp = popen("gnuplot -persistent", "w");
     plot->gp = popen("gnuplot", "w");
 
-    fprintf(plot->gp, "set yrange [-1:1]\n");
+    fprintf(plot->gp, "set yrange [-0.5:2]\n");
     //fprintf(plot->gp, "set y2range [0:1000]\n");
 }
 

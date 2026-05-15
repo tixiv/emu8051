@@ -72,6 +72,10 @@ int pout[4] = { 0 };
 
 int breakpoint = -1;
 
+int watchpoint = -1;
+
+int codemem_access = -1;
+
 // returns time in 1ms units
 int getTick()
 {
@@ -499,6 +503,17 @@ int main(int parc, char ** pars)
                 breakpoint = emu_readvalue(&emu, "Set Breakpoint", emu.mPC, 4);
             }
             break;
+        case 'w':
+            if (watchpoint != -1)
+            {
+                watchpoint = -1;
+                emu_popup(&emu, "Watchpoint", "Watchpoint cleared.");
+            }
+            else
+            {
+                watchpoint = emu_readvalue(&emu, "Set Watchpoint", emu.mPC, 4);
+            }
+            break;
         case 'g':
             emu.mPC = emu_readvalue(&emu, "Set Program Counter", emu.mPC, 4);
             break;
@@ -625,6 +640,13 @@ int main(int parc, char ** pars)
                 if (emu.mPC == breakpoint)
                     emu_exception(&emu, -1);
 
+                if (codemem_access != -1) {
+                    if (codemem_access == watchpoint) {
+                        emu_exception(&emu, -2);
+                    }
+                    codemem_access = -1;
+                }
+
                 if (ticked)
                 {
                     icount++;
@@ -665,6 +687,11 @@ int main(int parc, char ** pars)
     endwin();
 
     return EXIT_SUCCESS;
+}
+
+void watch_codemem_access(uint16_t addr)
+{
+    codemem_access = addr;
 }
 
 int readbyte(FILE * f)
