@@ -1,0 +1,8 @@
+
+CompileFlags:
+  Add:
+    - -D__SDCC
+    - -D__xdata=
+    - -D__idata=
+    - -D__pdata=
+    - -D__code=
