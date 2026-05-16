@@ -61,6 +61,7 @@ struct calibrator_board_t {
 
     uint8_t display_data;
 
+    uint8_t reg_8002;
     uint8_t reg_9000;
     uint8_t reg_9002;
 
@@ -100,7 +101,7 @@ void calibrator_board_init() {
     plot_init(&board->plot);
     integrator_init(&board->integrator);
 
-    board->mode = 2;
+    board->mode = 1;
 
     board->logfile = fopen("log", "w");
 }
@@ -165,10 +166,13 @@ void logicboard_tick(struct em8051 *aCPU) {
 
     io_board_tick(&board->io_board, akk, board->reg_9000);
     float measure_value = board->io_board.measure_voltage;
-    // float measure_value = akk / 5.0f;
+
+    if (board->reg_8002 & 0x80) {
+        // Measure *3 for thermocouples
+        measure_value *= 3.0f;
+    }
 
     double noise = ((double)rand() / RAND_MAX - 0.5) * 0.0001f;
-
     measure_value += noise;
 
     // The meter uses a 1.1V reference instead of 1V, so the numbers
@@ -193,6 +197,18 @@ uint8_t xram[0x8000];
 uint8_t write_map[0x8000];
 uint8_t read_map[0x8000];
 
+void trace_msg(const char *fmt, ...);
+
+// Registers
+// 8000  Multimeter Digits and data D4 D3 D2 D1 B8 B4 B2 B1
+//                                              PL OR UR
+// 8001  Keyboard Read 'columns'
+// 8002  PC7 = Measure * 3
+//
+// 9000  PA7 = key scan upper, PA6:PA0 = IO board Measure Range
+// 9001
+// 9002  PC7:4 = IO board Switch Posistion, PC3 = Key scan lower, PC2:0 = Disp RS R/W EN
+
 uint8_t calibrator_xread(struct em8051 *aCPU, uint16_t address) {
     if (address < 0x8000) {
         read_map[address] |= 1;
@@ -203,13 +219,28 @@ uint8_t calibrator_xread(struct em8051 *aCPU, uint16_t address) {
         case 0x8000:
             aCPU->mSFR[REG_TCON] &= ~TCONMASK_IE1;
             return board->multimeter.dat_8000;
-
         case 0x8001: return board->keys_out;
+        case 0x8002: return board->reg_8002;
+
         case 0x9000: return board->reg_9000;
-        case 0x9002: return (board->reg_9002 & 0x0f) | ((board->mode & 0x0f) << 4);
+        case 0x9002: return ((board->mode & 0x0f) << 4) | (board->reg_9002 & 0x0f);
+
+        default: trace_msg("Unhandled xread from %04x", address);
     }
 
     return 0xff;
+}
+
+void bit_mod(uint8_t *reg, uint8_t value) {
+    if ((value & 0x80) == 0) {
+        // bit mod PORTC
+        int bit_num = ((value & 0x0e) >> 1);
+
+        if (value & 0x01)
+            *reg |= (1 << bit_num);
+        else
+            *reg &= ~(1 << bit_num);
+    }
 }
 
 void calibrator_xwrite(struct em8051 *aCPU, uint16_t address, uint8_t value) {
@@ -220,19 +251,15 @@ void calibrator_xwrite(struct em8051 *aCPU, uint16_t address, uint8_t value) {
     }
 
     switch (address) {
+        case 0x8002: board->reg_8002 = value; break;
+        case 0x8003: bit_mod(&board->reg_8002, value); break;
+
         case 0x9000: board->reg_9000 = value; break;
         case 0x9001: board->display_data = value; break;
         case 0x9002: board->reg_9002 = value; break;
-        case 0x9003:
-            if ((value & 0x80) == 0) {
-                // bit mod PORTC
-                int bit_num = ((value & 0x0e) >> 1);
+        case 0x9003: bit_mod(&board->reg_9002, value); break;
 
-                if (value & 0x01)
-                    board->reg_9002 |= (1 << bit_num);
-                else
-                    board->reg_9002 &= ~(1 << bit_num);
-            }
+        default: trace_msg("Unhandled xwrite to %04x", address);
     }
 }
 
@@ -278,9 +305,9 @@ void trace_raw(const char *fmt, ...) {
 
 void trace_msg(const char *fmt, ...) {
     va_list ap;
-    
+
     uint64_t us_total = 1000000ull * clocks / opt_clock_hz;
-    
+
     int us = us_total % 1000000;
     int s = (us_total / 1000000) % 60;
     int m = us_total / 1000000 / 60;
@@ -304,8 +331,7 @@ void snapshot(struct em8051 *aCPU) {
     memset(write_map, 0, sizeof(write_map));
     memset(read_map, 0, sizeof(read_map));
     trace_msg("Snapshot taken at PC: %04x, Time: %14.3f ms\n",
-            aCPU->mPC, clocks / 1000.0f);
-    
+              aCPU->mPC, clocks / 1000.0f);
 }
 
 void hexdump(uint8_t *data, int len) {
@@ -356,7 +382,7 @@ void find_chains(uint8_t *map, const char *desc) {
 
 void diff(struct em8051 *aCPU) {
     trace_msg("Diff at PC: %04x, Time: %14.3f ms\n", aCPU->mPC,
-            clocks / 1000.0f);
+              clocks / 1000.0f);
     find_chains(read_map, "Reads");
     find_chains(write_map, "Writes");
 
@@ -417,13 +443,13 @@ void trace_multimeter_read(struct em8051 *aCPU) {
         return;
 
     trace_msg("Multimeter read from %04x '%s' range %02x\n",
-            caller, &xram[0xa0], board->reg_9000 & 0x7f);
+              caller, &xram[0xa0], board->reg_9000 & 0x7f);
 }
 
 void trace_multimeter_read_and_convert(struct em8051 *aCPU) {
 
     trace_msg("Multimeter read and convert from %04x %f range %02x\n",
-            get_caller(aCPU), *(float *)&xram[0x187c], board->reg_9000 & 0x7f);
+              get_caller(aCPU), *(float *)&xram[0x187c], board->reg_9000 & 0x7f);
 }
 
 void trace_math_op(struct em8051 *aCPU) {
@@ -431,7 +457,7 @@ void trace_math_op(struct em8051 *aCPU) {
     float v = *(float *)&xram[p];
 
     trace_msg("trace math op from %4x fac = %f, argument = %f, result = %2x %2x\n",
-        get_caller(aCPU), read_fac(aCPU), v, xram[0x70], xram[0x71]);
+              get_caller(aCPU), read_fac(aCPU), v, xram[0x70], xram[0x71]);
 }
 
 void trace_fun762(struct em8051 *aCPU) {
@@ -442,14 +468,31 @@ void trace_fun762(struct em8051 *aCPU) {
 void trace_pc(struct em8051 *aCPU) {
     uint16_t pc = aCPU->mPC;
 
-    switch (pc) {
-        case 0xddca: trace_multimeter_read(aCPU); break;
-        case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
-        case 0xe00a: trace_math_op(aCPU); break;
-        case 0x07c5: trace_fun762(aCPU); break;
-        case 0xdb82: trace_msg("Enable interrupt to read meter\n"); break;
-        case 0x17e2: trace_msg("ISR Quatsch loop begin\n"); break;
-        case 0x1812: trace_msg("ISR Quatsch loop end\n"); break;
-        case 0x182e: trace_msg("ISR Read digit %02x\n", aCPU->mSFR[REG_ACC]); break;
+    if (0) {
+        switch (pc) {
+            case 0xe00a: trace_math_op(aCPU); break;
+            case 0x07c5: trace_fun762(aCPU); break;
+        }
+    }
+
+    if (0) {
+        switch (pc) {
+            case 0xddca: trace_multimeter_read(aCPU); break;
+            case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
+            case 0xdb82: trace_msg("Enable interrupt to read meter\n"); break;
+        }
+
+        bool my_code = true;
+        if (my_code) {
+            switch (pc) {
+                case 0x17e2: trace_msg("ISR Read digit %02x\n", aCPU->mSFR[REG_ACC]); break;
+            }
+        } else {
+            switch (pc) {
+                case 0x17e2: trace_msg("ISR Quatsch loop begin\n"); break;
+                case 0x1812: trace_msg("ISR Quatsch loop end\n"); break;
+                case 0x182e: trace_msg("ISR Read digit %02x\n", aCPU->mSFR[REG_ACC]); break;
+            }
+        }
     }
 }

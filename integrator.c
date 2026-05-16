@@ -5,6 +5,8 @@
 extern unsigned int clocks;
 extern int opt_clock_hz;
 
+extern void trace_msg(const char *fmt, ...) ;
+
 void integrator_init (integrator_t *integrator) {
     integrator->akk = 0.0;
 }
@@ -57,6 +59,10 @@ void integrator_tick(integrator_t *integrator, struct em8051 *aCPU) {
 
     if (integrator->akk > 16.5f) integrator->akk = 16.5f;
     if (integrator->akk < -6.5f) integrator->akk = -6.5f;
+
+    if (port1 != integrator->last_port) {
+        trace_msg("Integrator write %02x\n", port1);
+    }
 
     integrator->last_port = port1;
 }
