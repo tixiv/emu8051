@@ -195,12 +195,6 @@ void logicboard_tick(struct em8051 *aCPU) {
         pout[3] |= 0x08;
     }
 
-    static uint8_t dbg_last;
-    if (board->_8255_8000.out_c != dbg_last) {
-        trace_msg("Out C changed from %02x to %02x", dbg_last, board->_8255_8000.out_c);
-        dbg_last = board->_8255_8000.out_c;
-    }
-
     keyboard_update();
 
     plot_update(&board->plot, measure_value);
