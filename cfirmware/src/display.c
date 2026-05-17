@@ -13,6 +13,7 @@
 #define BIT_RW 1
 #define BIT_RS 2
 
+// delays about 2.4 us per cycle
 void delay_16(uint16_t cycles) {
     (void)cycles;
     // clang-format off
@@ -32,6 +33,8 @@ void delay_16(uint16_t cycles) {
     // clang-format on
 }
 
+#define DELAY_US(x) delay_16((uint16_t)((float)(x)/2.4))
+
 void clock_data_to_display(void) {
     REG_CONTROL = BIT_MOD(BIT_EN, 1);
     REG_CONTROL = BIT_MOD(BIT_EN, 0);
@@ -44,39 +47,41 @@ void display_init(void) {
 
     REG_DATA = 0x3c;
     clock_data_to_display();
-    delay_16(50); // 13.931ms, 16.696ms
+    DELAY_US(2500);
     clock_data_to_display();
-    delay_16(5);
+    DELAY_US(200);
     clock_data_to_display();
-    delay_16(5);
+    DELAY_US(200);
     REG_DATA = 6;
     clock_data_to_display();
-    delay_16(5);
-    REG_DATA = 1;
+    DELAY_US(50);
+    REG_DATA = 1; // clear display
     clock_data_to_display();
-    delay_16(0x3c);
-    REG_DATA = 0xc;
+    DELAY_US(2500);
+    REG_DATA = 0xc; // display on, cursor off, blink off
     clock_data_to_display();
-    delay_16(5);
+    DELAY_US(40);
 }
 
 void display_put_char(char c) {
     REG_DATA = c;
     REG_CONTROL = BIT_MOD(BIT_RS, 1);
     clock_data_to_display();
-    delay_16(10);
+    DELAY_US(40);
 }
 
 void display_set_cursor(uint8_t row, uint8_t col) {
     REG_DATA = 0x80 | (uint8_t)(row << 6) | col;
     REG_CONTROL = BIT_MOD(BIT_RS, 0);
     clock_data_to_display();
-    delay_16(10);
+    DELAY_US(40);
 }
 
 float get_float(void) {
     return 16383.0f;
 }
+
+float soll = 10000;
 
 void display_print(char *str) {
     while (1) {
