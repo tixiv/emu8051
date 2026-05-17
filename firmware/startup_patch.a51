@@ -1,0 +1,6 @@
+
+.org 0x0000
+    ljmp 0xe100
+
+.org 0x0013
+    ljmp 0xe113
