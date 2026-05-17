@@ -1,4 +1,5 @@
 
+#include "_8255.h"
 #include "char_display.h"
 #include "integrator.h"
 #include "multimeter.h"
@@ -14,6 +15,11 @@
 
 extern unsigned int clocks;
 extern int opt_clock_hz;
+
+extern int pout[];
+
+void trace_msg(const char *fmt, ...);
+void trace_pc(struct em8051 *aCPU);
 
 typedef struct {
     float control_voltage;
@@ -53,23 +59,17 @@ void io_board_tick(io_board_t *iob, float integrator_voltage, uint8_t range) {
 }
 
 struct calibrator_board_t {
+    _8255_t _8255_8000;
+    _8255_t _8255_9000;
     struct display_t display;
     multimeter_t multimeter;
     integrator_t integrator;
     io_board_t io_board;
     plot_t plot;
 
-    uint8_t display_data;
-
-    uint8_t reg_8002;
-    uint8_t reg_9000;
-    uint8_t reg_9002;
-
     char new_key;
     char current_key;
     int key_timer;
-
-    uint8_t keys_out;
 
     // mode 0: I Source
     // mode 1: U Source / Thermocouple
@@ -122,7 +122,7 @@ void keyboard_update() {
     uint8_t keys_out = 0xff;
 
     if (board->current_key > 0) {
-        if ((board->reg_9000 & 0x80) == 0) {
+        if ((board->_8255_9000.out_a & 0x80) == 0) {
             switch (board->current_key) {
                 case '7': keys_out &= (uint8_t)~0x80; break;
                 case '8': keys_out &= (uint8_t)~0x20; break;
@@ -134,7 +134,7 @@ void keyboard_update() {
                 case '/': keys_out &= (uint8_t)~0x01; break;
             }
         }
-        if ((board->reg_9002 & 0x08) == 0) {
+        if ((board->_8255_9000.out_c & 0x08) == 0) {
             switch (board->current_key) {
                 case '1': keys_out &= (uint8_t)~0x80; break;
                 case '2': keys_out &= (uint8_t)~0x20; break;
@@ -148,26 +148,30 @@ void keyboard_update() {
         }
     }
 
-    board->keys_out = keys_out;
+    board->_8255_8000.in_b = keys_out;
 }
 
-void trace_pc(struct em8051 *aCPU);
+void mutimeter_strobe_callback(uint8_t value) {
+    _8255_porta_strobed_input(&board->_8255_8000, value);
+}
 
 void logicboard_tick(struct em8051 *aCPU) {
-    uint8_t c = board->reg_9002;
+    uint8_t c = board->_8255_9000.out_c;
     uint8_t ctrl = ((c & 0x01) ? 0x80 : 0) | // EN
                    ((c & 0x02) ? 0x20 : 0) | // R/W
                    ((c & 0x04) ? 0x40 : 0);  // RS
 
-    display_tick(&board->display, board->display_data, ctrl);
+    display_tick(&board->display, board->_8255_9000.out_b, ctrl);
+
+    board->_8255_9000.in_c = (board->mode & 0x0f) << 4;
 
     integrator_tick(&board->integrator, aCPU);
     float akk = board->integrator.akk;
 
-    io_board_tick(&board->io_board, akk, board->reg_9000);
+    io_board_tick(&board->io_board, akk, board->_8255_9000.out_a & 0x7f);
     float measure_value = board->io_board.measure_voltage;
 
-    if (board->reg_8002 & 0x80) {
+    if (board->_8255_8000.out_c & 0x80) {
         // Measure *3 for thermocouples
         measure_value *= 3.0f;
     }
@@ -180,10 +184,22 @@ void logicboard_tick(struct em8051 *aCPU) {
     // Probably this decision is due to the 20mA range
     float multimeter_value = measure_value / 1.1f;
 
-    // if (clocks > 3660000)
-    //   multimeter_value = 1.6383;
+    multimeter_tick(aCPU, &board->multimeter, multimeter_value, mutimeter_strobe_callback);
 
-    multimeter_tick(aCPU, &board->multimeter, multimeter_value);
+    // 8255 strobed data / interrupt
+    if (board->_8255_8000.out_c & 0x08) { // PC3: INTRA
+        aCPU->mSFR[REG_TCON] |= TCONMASK_IE1;
+        pout[3] &= ~0x08;
+    } else {
+        aCPU->mSFR[REG_TCON] &= ~TCONMASK_IE1;
+        pout[3] |= 0x08;
+    }
+
+    static uint8_t dbg_last;
+    if (board->_8255_8000.out_c != dbg_last) {
+        trace_msg("Out C changed from %02x to %02x", dbg_last, board->_8255_8000.out_c);
+        dbg_last = board->_8255_8000.out_c;
+    }
 
     keyboard_update();
 
@@ -196,8 +212,6 @@ uint8_t xram[0x8000];
 
 uint8_t write_map[0x8000];
 uint8_t read_map[0x8000];
-
-void trace_msg(const char *fmt, ...);
 
 // Registers
 // 8000  Multimeter Digits and data D4 D3 D2 D1 B8 B4 B2 B1
@@ -215,32 +229,25 @@ uint8_t calibrator_xread(struct em8051 *aCPU, uint16_t address) {
         return xram[address];
     }
 
-    switch (address) {
-        case 0x8000:
-            aCPU->mSFR[REG_TCON] &= ~TCONMASK_IE1;
-            return board->multimeter.dat_8000;
-        case 0x8001: return board->keys_out;
-        case 0x8002: return board->reg_8002;
-
-        case 0x9000: return board->reg_9000;
-        case 0x9002: return ((board->mode & 0x0f) << 4) | (board->reg_9002 & 0x0f);
-
-        default: trace_msg("Unhandled xread from %04x", address);
+    if ((address & 0xfffc) == 0x8000) {
+        return _8255_read(&board->_8255_8000, address);
+    }
+    else if ((address & 0xfffc) == 0x9000) {
+        return _8255_read(&board->_8255_9000, address);
+    }
+    else {
+        trace_msg("Unhandled xread from %04x", address);
     }
 
     return 0xff;
 }
 
-void bit_mod(uint8_t *reg, uint8_t value) {
-    if ((value & 0x80) == 0) {
-        // bit mod PORTC
-        int bit_num = ((value & 0x0e) >> 1);
+void tracepoint(struct em8051 *aCPU, uint8_t value) {
+    static uint32_t last_clocks;
+    float delta_time = (float)(clocks - last_clocks) / opt_clock_hz;
+    last_clocks = clocks;
 
-        if (value & 0x01)
-            *reg |= (1 << bit_num);
-        else
-            *reg &= ~(1 << bit_num);
-    }
+    trace_msg("Tracepoint %d hit at PC=%04x, delta_time=%fms", value, aCPU->mPC, delta_time * 1000.0f);
 }
 
 void calibrator_xwrite(struct em8051 *aCPU, uint16_t address, uint8_t value) {
@@ -250,16 +257,17 @@ void calibrator_xwrite(struct em8051 *aCPU, uint16_t address, uint8_t value) {
         return;
     }
 
-    switch (address) {
-        case 0x8002: board->reg_8002 = value; break;
-        case 0x8003: bit_mod(&board->reg_8002, value); break;
-
-        case 0x9000: board->reg_9000 = value; break;
-        case 0x9001: board->display_data = value; break;
-        case 0x9002: board->reg_9002 = value; break;
-        case 0x9003: bit_mod(&board->reg_9002, value); break;
-
-        default: trace_msg("Unhandled xwrite to %04x", address);
+    if ((address & 0xfffc) == 0x8000) {
+        _8255_write(&board->_8255_8000, address, value);
+    }
+    else if ((address & 0xfffc) == 0x9000) {
+        _8255_write(&board->_8255_9000, address, value);
+    }
+    else if (address == 0xffff) {
+        tracepoint(aCPU, value);
+    }
+    else {
+        trace_msg("Unhandled xwrite to %04x", address);
     }
 }
 
@@ -287,7 +295,7 @@ void calibrator_board_render(struct em8051 *aCPU) {
     mvprintw(17, 40, "last = %02x", board->integrator.last_pulse_value);
     mvprintw(18, 40, "pc = %04x", board->integrator.written_from);
 
-    mvprintw(18, 0, "range = %02x", board->reg_9000 & 0x7f);
+    mvprintw(18, 0, "range = %02x", board->_8255_9000.out_a & 0x7f);
 
     mvprintw(19, 0, "key = '%c' = %02x  ",
              (board->current_key > 0 ? board->current_key : '^'),
@@ -317,6 +325,10 @@ void trace_msg(const char *fmt, ...) {
     va_start(ap, fmt);
     vfprintf(board->logfile, fmt, ap);
     va_end(ap);
+
+    if (fmt[strlen(fmt) - 1] != '\n')
+        fprintf(board->logfile, "\n");
+
     fflush(board->logfile);
 }
 
@@ -443,13 +455,13 @@ void trace_multimeter_read(struct em8051 *aCPU) {
         return;
 
     trace_msg("Multimeter read from %04x '%s' range %02x\n",
-              caller, &xram[0xa0], board->reg_9000 & 0x7f);
+              caller, &xram[0xa0], board->_8255_9000.out_a & 0x7f);
 }
 
 void trace_multimeter_read_and_convert(struct em8051 *aCPU) {
 
     trace_msg("Multimeter read and convert from %04x %f range %02x\n",
-              get_caller(aCPU), *(float *)&xram[0x187c], board->reg_9000 & 0x7f);
+              get_caller(aCPU), *(float *)&xram[0x187c], board->_8255_9000.out_a & 0x7f);
 }
 
 void trace_math_op(struct em8051 *aCPU) {
@@ -475,20 +487,20 @@ void trace_pc(struct em8051 *aCPU) {
         }
     }
 
-    if (0) {
+    if (1) {
         switch (pc) {
             case 0xddca: trace_multimeter_read(aCPU); break;
             case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
-            case 0xdb82: trace_msg("Enable interrupt to read meter\n"); break;
         }
 
         bool my_code = true;
         if (my_code) {
             switch (pc) {
-                case 0x17e2: trace_msg("ISR Read digit %02x\n", aCPU->mSFR[REG_ACC]); break;
+                case 0xdb75: trace_msg("Multimeter read begin\n"); break;
             }
         } else {
             switch (pc) {
+                case 0xdb82: trace_msg("Enable interrupt to read meter\n"); break;
                 case 0x17e2: trace_msg("ISR Quatsch loop begin\n"); break;
                 case 0x1812: trace_msg("ISR Quatsch loop end\n"); break;
                 case 0x182e: trace_msg("ISR Read digit %02x\n", aCPU->mSFR[REG_ACC]); break;

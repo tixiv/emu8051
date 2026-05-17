@@ -5,6 +5,8 @@
 
 #include <string.h>
 
+extern void trace_msg(const char *fmt, ...);
+
 // 44780 -style character display
 
 extern int opt_clock_hz;
@@ -98,6 +100,8 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
     {	// P3.7
         // Write op
         // - E level drops from high to low on write ops
+
+        // trace_msg("Display write RS=%d DAT=%02x busy=%d", control & 0x40 ? 1:0, data, disp->busy);
 
         if (disp->_4bmode == 0)
         {

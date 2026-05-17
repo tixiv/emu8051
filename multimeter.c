@@ -14,8 +14,8 @@ void multimeter_init(multimeter_t *meter) {
     meter->data_count = -1;
 }
 
-void multimeter_tick(struct em8051 *aCPU, multimeter_t *meter, float value) {
-    if (meter->measure_cycle == 24000) {
+void multimeter_tick(struct em8051 *aCPU, multimeter_t *meter, float value, mutimeter_strobe_callback_t callback) {
+    if (meter->measure_cycle == 20000) {
         trace_msg("Multimeter sample %f\n", value);
 
         // 2V full range
@@ -53,7 +53,7 @@ void multimeter_tick(struct em8051 *aCPU, multimeter_t *meter, float value) {
 
     meter->measure_cycle++;
 
-    if (meter->measure_cycle == 96000) {
+    if (meter->measure_cycle == 80000) {
         trace_msg("Multimeter ready\n");
         meter->measure_cycle = 0;
         meter->data_count = 0;
@@ -72,9 +72,7 @@ void multimeter_tick(struct em8051 *aCPU, multimeter_t *meter, float value) {
                 case 4: digit = 0x10; break;
             }
 
-            meter->dat_8000 = (meter->digits[meter->data_count] - 0x30) | digit;
-
-            aCPU->mSFR[REG_TCON] |= TCONMASK_IE1;
+            callback((meter->digits[meter->data_count] - 0x30) | digit);
 
             meter->data_count++;
             if (meter->data_count == 5)

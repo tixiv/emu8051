@@ -178,7 +178,7 @@ uint8_t emu_sfrread(struct em8051 *aCPU, uint8_t aRegister)
 {
     int outputbyte = -1;
 
-    if (view == LOGICBOARD_VIEW)
+    if (true || view == LOGICBOARD_VIEW)
     {
         if (aRegister == REG_P0 + 0x80)
         {
@@ -218,7 +218,7 @@ uint8_t emu_sfrread(struct em8051 *aCPU, uint8_t aRegister)
     }
     if (outputbyte != -1)
     {
-        if (opt_input_outputlow == 1)
+        if (true || opt_input_outputlow == 1)
         {
             // option: output 1 even though ouput latch is 0
             return outputbyte;
