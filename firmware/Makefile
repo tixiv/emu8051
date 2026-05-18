@@ -19,10 +19,10 @@ $(BUILD_DIR)/%.a51.hex: %.a51
 	as31 -O$@ $<
 
 $(BOTH_HEX): $(PATCH) $(STARTUP_PATCH) $(C_FIRMWARE_HEX)
-	srec_cat CAL_05.bin -binary -offset 0x0000 -crop 0x0000 0xe0ff \
+	srec_cat CAL_05.bin -binary -offset 0x0000 \
 	         $(STARTUP_PATCH) -Intel -multiple \
 	         $(PATCH) -Intel -multiple \
-			 $(C_FIRMWARE_HEX) -Intel \
+			 $(C_FIRMWARE_HEX) -Intel -exclude 0xF000 0xF057 -multiple \
 	         -o $(BOTH_HEX) -Intel -address-length=2
 
 $(PATCHED_HEX): $(PATCH)

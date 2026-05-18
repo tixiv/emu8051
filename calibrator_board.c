@@ -186,7 +186,7 @@ void logicboard_tick(struct em8051 *aCPU) {
 
     multimeter_tick(aCPU, &board->multimeter, multimeter_value, mutimeter_strobe_callback);
 
-    // 8255 strobed data / interrupt
+    // 8255 strobed data interrupt
     if (board->_8255_8000.out_c & 0x08) { // PC3: INTRA
         aCPU->mSFR[REG_TCON] |= TCONMASK_IE1;
         pout[3] &= ~0x08;
@@ -437,10 +437,14 @@ float read_fac(struct em8051 *aCPU) {
     return f;
 }
 
-uint16_t get_caller(struct em8051 *aCPU) {
-    uint8_t sp = aCPU->mSFR[REG_SP];
+uint16_t get_caller_n(struct em8051 *aCPU, int n) {
+    uint8_t sp = aCPU->mSFR[REG_SP] - n*2;
     uint8_t *d = aCPU->mLowerData;
     return d[sp] << 8 | d[sp - 1];
+}
+
+uint16_t get_caller(struct em8051 *aCPU) {
+    return get_caller_n(aCPU, 0);
 }
 
 void trace_multimeter_read(struct em8051 *aCPU) {
@@ -471,17 +475,23 @@ void trace_fun762(struct em8051 *aCPU) {
     trace_msg("fun762 from %04x\n", caller);
 }
 
+void trace_codemem_acces(struct em8051 *aCPU, uint16_t addr) {
+    if (addr >= 0xe100) {
+        trace_msg("Codemem acces at %04x from %04x", addr, get_caller_n(aCPU, 2));
+    }
+}
+
 void trace_pc(struct em8051 *aCPU) {
     uint16_t pc = aCPU->mPC;
 
-    if (0) {
+    if (1) {
         switch (pc) {
             case 0xe00a: trace_math_op(aCPU); break;
             case 0x07c5: trace_fun762(aCPU); break;
         }
     }
 
-    if (1) {
+    if (0) {
         switch (pc) {
             case 0xddca: trace_multimeter_read(aCPU); break;
             case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;

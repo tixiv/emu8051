@@ -685,9 +685,12 @@ int main(int parc, char ** pars)
     return EXIT_SUCCESS;
 }
 
-void watch_codemem_access(uint16_t addr)
+extern void trace_codemem_acces(struct em8051 *aCPU, uint16_t addr);
+
+void watch_codemem_access(struct em8051 *aCPU, uint16_t addr)
 {
     codemem_access = addr;
+    trace_codemem_acces(aCPU, addr);
 }
 
 int readbyte(FILE * f)
