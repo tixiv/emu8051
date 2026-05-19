@@ -24,12 +24,7 @@ void io_init(void) {
     DAT_EXTMEM(0x9002) = 0;    // keyscan lower low
 }
 
-extern float get_float(void);
-
-
 #define TRACE_MAIN(x) TRACE(x)
-
-extern float soll;
 
 extern void delay_16(uint16_t cycles);
 
@@ -76,7 +71,7 @@ void do_integrator(float diff) {
 
 }
 
-__code const char *language_table = (__code uint8_t*)0x6000;
+__code const char *language_table = (__code char*)0x6000;
 
 void display_i_string(uint8_t row, uint8_t idx) {
 	display_set_cursor(row, 0);

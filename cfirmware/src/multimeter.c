@@ -1,14 +1,19 @@
 
+
+#include "multimeter.h"
+
 #include "general.h"
 #include <stdint.h>
 #include <stdlib.h>
+#include <8051.h>
 
 volatile uint8_t multimeter_state;
 
-static uint8_t multimeter_digits[5];
+uint8_t multimeter_digits[5];
 
 void int1_isr(void) __interrupt (2)
 {
+	TRACE(133);
 	uint8_t v = DAT_EXTMEM(0X8000);
 	uint8_t s = multimeter_state;
 	if (s == 0) {
@@ -25,11 +30,12 @@ void int1_isr(void) __interrupt (2)
 	}
 }
 
-static char buff[10];
 
 float read_multimeter_and_convert_result(void) {
+	TRACE(1);
 	while(multimeter_state != 6);
 
+	char buff[10];
 	char *p = buff;
 
 	if ((multimeter_digits[0] & 0x08) == 0)

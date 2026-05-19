@@ -27,6 +27,7 @@ uint8_t _8255_read(_8255_t *s, uint16_t reg) {
             update_port_c(s);
             
             if ((s->control & 0x70) == 0x30) { // Port A mode 1 input
+                trace_msg("8255 Sync data read = %x", s->in_a_latch);
                 return s->in_a_latch;
             } else {
                 return s->control & 0x10 ? s->in_a : s->out_a;

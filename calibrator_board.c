@@ -204,6 +204,12 @@ void logicboard_tick(struct em8051 *aCPU) {
         pout[3] |= 0x08;
     }
 
+    static uint8_t old_portc;
+    if (board->_8255_8000.out_c != old_portc) {
+        trace_msg("Port C changed to %02X", board->_8255_8000.out_c);
+        old_portc = board->_8255_8000.out_c;
+    }
+
     keyboard_update();
 
     plot_update(&board->plot, measure_value);
