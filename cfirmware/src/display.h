@@ -4,4 +4,5 @@
 void display_init(void);
 void display_put_char(char c);
 void display_set_cursor(uint8_t row, uint8_t col);
-void display_print(char *str);
+void display_print(const char *str);
+void display_print_16(const char *str);

@@ -16,7 +16,7 @@ void multimeter_init(multimeter_t *meter) {
 
 void multimeter_tick(struct em8051 *aCPU, multimeter_t *meter, float value, mutimeter_strobe_callback_t callback) {
     if (meter->measure_cycle == 20000) {
-        // trace_msg("Multimeter sample %f\n", value);
+        trace_msg("Multimeter sample %f\n", value);
 
         // 2V full range
         int v = (value * 10000.0f) + 0.5f;
@@ -54,7 +54,7 @@ void multimeter_tick(struct em8051 *aCPU, multimeter_t *meter, float value, muti
     meter->measure_cycle++;
 
     if (meter->measure_cycle == 80000) {
-        // trace_msg("Multimeter ready\n");
+        trace_msg("Multimeter ready\n");
         meter->measure_cycle = 0;
         meter->data_count = 0;
     }

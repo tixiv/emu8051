@@ -83,10 +83,18 @@ float get_float(void) {
 
 float soll = 10000;
 
-void display_print(char *str) {
+void display_print(const char *str) {
     while (1) {
         char c = *str++;
         if (c == 0) break;
+        display_put_char(c);
+    }
+}
+
+void display_print_16(const char *str) {
+    uint8_t i = 16;
+    while (i--) {
+        char c = *str++;
         display_put_char(c);
     }
 }

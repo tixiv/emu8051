@@ -10,6 +10,8 @@ typedef struct {
     uint8_t last_pulse_value;
     uint16_t written_from;
     int last_clocks;
+    int last_activation;
+    double last_activation_akk;
 } integrator_t;
 
 void integrator_init (integrator_t *integrator);

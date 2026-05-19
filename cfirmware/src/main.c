@@ -1,5 +1,8 @@
 
+#include "general.h"
 #include "display.h"
+#include "keyboard.h"
+#include "multimeter.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,100 +10,47 @@
 #include <8051.h>
 
 
-
 int putchar(int c) {
     display_put_char((char)c);
     return c;
 }
 
-#define DAT_EXTMEM(x) *((__xdata volatile uint8_t *)x)
-
-#define TRACE(x) DAT_EXTMEM(0xffff)=(x)
-// #define TRACE(x)
-
 void io_init(void) {
     P1 = 0x65;
     DAT_EXTMEM(0X9003) = 0x88;
     DAT_EXTMEM(0X8003) = 0xb2;
-    DAT_EXTMEM(0X9000) = 0xb7;
-    DAT_EXTMEM(0x9002) = 8;
-    DAT_EXTMEM(0X8003) = 8;
+    DAT_EXTMEM(0X9000) = 0x37; // keyscan upper low, measure range
+    DAT_EXTMEM(0X8003) = 8;    // disable multimeter ineterrupt
+    DAT_EXTMEM(0x9002) = 0;    // keyscan lower low
 }
 
 extern float get_float(void);
 
 
-
-volatile uint8_t multimeter_state;
-
-uint8_t multimeter_digits[5];
-
-void int1_isr(void) __interrupt (2)
-{
-	uint8_t v = DAT_EXTMEM(0X8000);
-	uint8_t s = multimeter_state;
-	if (s == 0) {
-		// sync with MSD D5, it will have 0 in the upper nibble
-		if (v & 0xf0)
-			return;
-
-		s = 1;
-	}
-
-	if (s < 6) {
-		multimeter_digits[s-1] = v;
-		multimeter_state = s + 1;
-	}
-}
-
-float read_multimeter_and_convert_result(void) {
-	while(multimeter_state != 6);
-
-	char buff[10];
-	char *p = buff;
-
-	if ((multimeter_digits[0] & 0x08) == 0)
-		*p++ = '-';
-
-	*p++ = (multimeter_digits[0] & 0x01) | 0x30;
-	*p++ = (multimeter_digits[1] & 0x0f) | 0x30;
-	*p++ = (multimeter_digits[2] & 0x0f) | 0x30;
-	*p++ = (multimeter_digits[3] & 0x0f) | 0x30;
-	*p++ = (multimeter_digits[4] & 0x0f) | 0x30;
-
-	multimeter_state = 0;
-
-	TRACE(1);
-
-	float v = atoi(buff);
-
-	TRACE(2);
-
-	return v;
-}
+#define TRACE_MAIN(x) TRACE(x)
 
 extern float soll;
 
 extern void delay_16(uint16_t cycles);
 
 void pulse_integrator(uint8_t cycles, uint8_t value) {
-	TRACE(27);
+	TRACE_MAIN(27);
 	P1 = value;
 	delay_16(cycles);
 	P1 = 0x65;
-	TRACE(28);
+	TRACE_MAIN(28);
 }
 
 uint8_t break_cycle;
 
 void pulse_integrator_big(float diff, uint8_t value){
-	TRACE(29);
+	TRACE_MAIN(29);
 	uint16_t d = diff / 5.0f;
 	P1 = value;
 	delay_16(d);
 	break_cycle = 2;
 	P1 = 0x65;
-	TRACE(30);
+	TRACE_MAIN(30);
 }
 
 void do_integrator(float diff) {
@@ -126,25 +76,46 @@ void do_integrator(float diff) {
 
 }
 
+__code const char *language_table = (__code uint8_t*)0x6000;
+
+void display_i_string(uint8_t row, uint8_t idx) {
+	display_set_cursor(row, 0);
+	display_print_16(&language_table[idx * 16]);
+}
+
+void pulse_integrator_test(uint16_t cycles);
+
+void integrator_calib(void);
+
+uint8_t cycles = 100;
+
 int main(void) {
     io_init();
     display_init();
 
-	display_set_cursor(0,0);
-	display_print("Hallo");
+	display_i_string(0, 0x00);
+	display_i_string(1, 0x0b);
 
-	DAT_EXTMEM(0X9000) = 0x5d | 0x80; // measure range 15V, keyb scan high
+	DAT_EXTMEM(0X9000) = 0x5d; // measure range 15V, keyb scan low
 
  	DAT_EXTMEM(0X8003) = 0x09; // Set PC4 = interrupt enable
 
 	TCON = 0x00;  // level triggered INT1
 	IE   = 0x84;   // enable INT1 + global
 
+
+
+	// integrator_calib();
+
+	// while(1);
+
+
 	while(1) {
-		TRACE(0);
+		TRACE_MAIN(0);
 		float v = read_multimeter_and_convert_result();
 
 
+		/*
 		if (!break_cycle) {
 			float diff = soll - v;
 			do_integrator(diff);
@@ -152,39 +123,56 @@ int main(void) {
 			break_cycle--;
 		}
 
+		*/
+
+
+		if (cycles) {
+			TRACE(100 + cycles);
+			pulse_integrator_test(cycles);
+			cycles --;
+		}
+
 		char buffer[10];
 
-		TRACE(3);
+		TRACE_MAIN(3);
 		int iv = v;
 		TRACE(4);
 	    __itoa(iv, buffer, 10);
-        TRACE(5);
+        TRACE_MAIN(5);
 
 		display_set_cursor(0,0);
 		display_print(buffer);
 		display_print("      ");
 
-		TRACE(6);
+		TRACE_MAIN(6);
         v = v * 1.1f;
-		TRACE(7);
+		TRACE_MAIN(7);
 		iv = v;
-		TRACE(8);
+		TRACE_MAIN(8);
 	    __itoa((int)v, buffer, 10);
-		TRACE(9);
+		TRACE_MAIN(9);
         
 		display_set_cursor(1,0);
 		display_print(buffer);
 		display_print("      ");
+
+		update_keyboard();
+
+		if (key_buffer) {
+			if (key_buffer == 1) {
+				// Haha, this crashes sdcc: '((void *(void))0x1234)();'
+
+				IE   = 0;
+				P1 = 0x65;
+				((void (*)(void))0xe0c8)(); // jump to original firmware start
+			}
+			
+			display_set_cursor(1,15);
+			display_put_char(key_buffer);
+			key_buffer = 0;
+
+		}
+
+
 	}
-
-	/*
-	char buffer[10];
-
-	sprintf(buffer, "A %d A", 1234);
-
-	display_set_cursor(0,0);
-	display_print(buffer);
-
-	while(1){}
-	*/
 }

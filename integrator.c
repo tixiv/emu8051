@@ -61,7 +61,17 @@ void integrator_tick(integrator_t *integrator, struct em8051 *aCPU) {
     if (integrator->akk < -6.5f) integrator->akk = -6.5f;
 
     if (port1 != integrator->last_port) {
-        trace_msg("Integrator write %02x\n", port1);
+        if (port1 == 0x65 || port1 == 0x6d) {
+            int period = clocks - integrator->last_activation;
+            trace_msg("Integrator was pulsed to %02x for %d cycles = %f ms, delta u = %f\n",
+                 integrator->last_port, 
+                 period / 12,
+                 period / (float)opt_clock_hz * 1000.0f,
+                 integrator->akk - integrator->last_activation_akk);
+        } else {
+            integrator->last_activation = clocks;
+            integrator->last_activation_akk = integrator->akk;
+        }
     }
 
     integrator->last_port = port1;

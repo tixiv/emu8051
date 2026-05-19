@@ -27,7 +27,7 @@ typedef struct {
 
 } io_board_t;
 
-void io_board_tick(io_board_t *iob, float integrator_voltage, uint8_t range) {
+void io_board_tick(io_board_t *iob, float integrator_voltage, uint8_t range, bool open_loop) {
     // Ranges:
     //       M*10 Val GND Batt Temp  Sel Ctrl/10                    Int V  ->  Out   -> measure
     // 0x5f    1   0   1    1    1    1    1      -> Source 20 mA     10 V -> 20 mA  -> 2.00 V
@@ -40,6 +40,8 @@ void io_board_tick(io_board_t *iob, float integrator_voltage, uint8_t range) {
     // 0x1d    0   0   1    1    1    0    1      -> Measure 42 V
     // 0x6f    1   1   0    1    1    1    1      -> Measure GND * 10
     // 0x2f    0   1   0    1    1    1    1      -> Measure GND
+    // 0x3f    0   1   1    1    1    1    1      -> Measure Integrator 10V -> (0.2V)  -> 0.20v
+    // 0x3e    0   1   1    1    1    1    0      -> Measure Integrator 10V ->  (2V)   -> 2.00v
 
     float measure_mult = (range & 0x40) ? 10.0f : 1.0f;
     float control_mult = (range & 0x01) ? .02f : .2f;
@@ -52,7 +54,12 @@ void io_board_tick(io_board_t *iob, float integrator_voltage, uint8_t range) {
         case 0x04: mv = 17.4 * 0.01; break;          // temperature
         case 0x08: mv = 5.26 * 0.1; break;           // battery
         case 0x10: mv = 0.001f; break;               // GND
-        case 0x20: mv = iob->control_voltage; break; // measure, not reverse engineered yet
+        case 0x20:                                   // measure
+            if (!open_loop)
+                mv = iob->control_voltage;
+            else
+                mv = 0.0f;
+            break; 
     }
 
     iob->measure_voltage = mv * measure_mult;
@@ -70,6 +77,8 @@ struct calibrator_board_t {
     char new_key;
     char current_key;
     int key_timer;
+
+    bool open_loop;
 
     // mode 0: I Source
     // mode 1: U Source / Thermocouple
@@ -101,7 +110,7 @@ void calibrator_board_init() {
     plot_init(&board->plot);
     integrator_init(&board->integrator);
 
-    board->mode = 1;
+    board->mode = 0;
 
     board->logfile = fopen("log", "w");
 }
@@ -168,7 +177,7 @@ void logicboard_tick(struct em8051 *aCPU) {
     integrator_tick(&board->integrator, aCPU);
     float akk = board->integrator.akk;
 
-    io_board_tick(&board->io_board, akk, board->_8255_9000.out_a & 0x7f);
+    io_board_tick(&board->io_board, akk, board->_8255_9000.out_a & 0x7f, board->open_loop);
     float measure_value = board->io_board.measure_voltage;
 
     if (board->_8255_8000.out_c & 0x80) {
@@ -211,10 +220,10 @@ uint8_t read_map[0x8000];
 // 8000  Multimeter Digits and data D4 D3 D2 D1 B8 B4 B2 B1
 //                                              PL OR UR
 // 8001  Keyboard Read 'columns'
-// 8002  PC7 = Measure * 3
+// 8002  PC7 = Measure*3, PC6 ?, PC5:3 = Multimeter handshake, PC2:0 ? 
 //
 // 9000  PA7 = key scan upper, PA6:PA0 = IO board Measure Range
-// 9001
+// 9001  Display data
 // 9002  PC7:4 = IO board Switch Posistion, PC3 = Key scan lower, PC2:0 = Disp RS R/W EN
 
 uint8_t calibrator_xread(struct em8051 *aCPU, uint16_t address) {
@@ -295,7 +304,8 @@ void calibrator_board_render(struct em8051 *aCPU) {
              (board->current_key > 0 ? board->current_key : '^'),
              board->current_key);
     mvprintw(20, 0, "key_timer = '%d'  ", board->key_timer);
-    mvprintw(21, 0, "mode = '%x'  ", board->mode);
+    mvprintw(21, 0, "mode = %d  ", board->mode);
+    mvprintw(22, 0, "loop = %s  ", board->open_loop ? "open": "closed");
 }
 
 void trace_raw(const char *fmt, ...) {
@@ -397,23 +407,13 @@ void diff(struct em8051 *aCPU) {
 
 void logicboard_editor_keys(struct em8051 *aCPU, int ch) {
     switch (ch) {
-        case 's':
-            snapshot(aCPU);
-            break;
-        case 'd':
-            diff(aCPU);
-            break;
-        case 'M':
-            board->mode = (board->mode + 1) % 16;
-            break;
-        case '>':
-            board->integrator.akk += 0.5f;
-            break;
-        case '<':
-            board->integrator.akk -= 0.5f;
-            break;
-        default:
-            board->new_key = ch;
+        case 's': snapshot(aCPU); break;
+        case 'd': diff(aCPU); break;
+        case 'M':  board->mode = (board->mode + 1) % 16; break;
+        case '>':  board->integrator.akk += 0.5f; break;
+        case '<':  board->integrator.akk -= 0.5f; break;
+        case 'o':  board->open_loop = !board->open_loop; break;
+        default:   board->new_key = ch; break;
     }
 }
 
@@ -477,24 +477,24 @@ void trace_fun762(struct em8051 *aCPU) {
 
 void trace_codemem_acces(struct em8051 *aCPU, uint16_t addr) {
     if (addr >= 0xe100) {
-        trace_msg("Codemem acces at %04x from %04x", addr, get_caller_n(aCPU, 2));
+        // trace_msg("Codemem acces at %04x from %04x", addr, get_caller_n(aCPU, 2));
     }
 }
 
 void trace_pc(struct em8051 *aCPU) {
     uint16_t pc = aCPU->mPC;
 
-    if (1) {
+    if (0) {
         switch (pc) {
             case 0xe00a: trace_math_op(aCPU); break;
             case 0x07c5: trace_fun762(aCPU); break;
+            case 0xddca: trace_multimeter_read(aCPU); break;
+            case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
         }
     }
 
     if (0) {
         switch (pc) {
-            case 0xddca: trace_multimeter_read(aCPU); break;
-            case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
         }
 
         bool my_code = true;
