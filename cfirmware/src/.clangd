@@ -1,8 +1,15 @@
 
 CompileFlags:
   Add:
-    - -D__SDCC
+    - -xc
+    - -std=c99
+    - -D__data=
     - -D__xdata=
-    - -D__idata=
-    - -D__pdata=
     - -D__code=
+    - -D__reentrant=
+    - -D__interrupt(...)=
+    - -D__at(...)=
+    - -D__sfr=volatile unsigned char
+    - -D__sbit=volatile unsigned char
+    - -I/usr/local/share/sdcc/include
+    - -I/usr/local/share/sdcc/include/mcs51

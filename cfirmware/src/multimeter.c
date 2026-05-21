@@ -13,7 +13,6 @@ uint8_t multimeter_digits[5];
 
 void int1_isr(void) __interrupt (2)
 {
-	TRACE(133);
 	uint8_t v = DAT_EXTMEM(0X8000);
 	uint8_t s = multimeter_state;
 	if (s == 0) {
@@ -31,12 +30,25 @@ void int1_isr(void) __interrupt (2)
 }
 
 
+static char buff[7]; // "-12345\x00"
+
 float read_multimeter_and_convert_result(void) {
 	TRACE(1);
 	while(multimeter_state != 6);
 
-	char buff[10];
 	char *p = buff;
+
+	if (multimeter_digits[0] & 0x04) { // overload
+		if (multimeter_digits[0] & 0x08) {
+			multimeter_state = 0; // can't put the reset before the if because it invalidates digits[0]
+			return 2.22222f;
+		}			
+		else
+		{
+			multimeter_state = 0; // can't put the reset before the if because it invalidates digits[0]
+			return -2.22222f;
+		}
+	}
 
 	if ((multimeter_digits[0] & 0x08) == 0)
 		*p++ = '-';
@@ -46,10 +58,11 @@ float read_multimeter_and_convert_result(void) {
 	*p++ = (multimeter_digits[2] & 0x0f) | 0x30;
 	*p++ = (multimeter_digits[3] & 0x0f) | 0x30;
 	*p++ = (multimeter_digits[4] & 0x0f) | 0x30;
+	*p = 0;
 
 	multimeter_state = 0;
 
 	float v = atoi(buff);
 	
-    return v * 1.1f;
+    return v * (1.1f / 10000.0f);
 }

@@ -42,6 +42,7 @@ void io_board_tick(io_board_t *iob, float integrator_voltage, uint8_t range, boo
     // 0x2f    0   1   0    1    1    1    1      -> Measure GND
     // 0x3f    0   1   1    1    1    1    1      -> Measure Integrator 10V -> (0.2V)  -> 0.20v
     // 0x3e    0   1   1    1    1    1    0      -> Measure Integrator 10V ->  (2V)   -> 2.00v
+    // 0x7e    1   1   1    1    1    1    0      -> Measure Integrator  1V -> (0.2V)   -> 2.00v
 
     float measure_mult = (range & 0x40) ? 10.0f : 1.0f;
     float control_mult = (range & 0x01) ? .02f : .2f;
@@ -206,7 +207,7 @@ void logicboard_tick(struct em8051 *aCPU) {
 
     static uint8_t old_portc;
     if (board->_8255_8000.out_c != old_portc) {
-        trace_msg("Port C changed to %02X", board->_8255_8000.out_c);
+        // trace_msg("Port C changed to %02X", board->_8255_8000.out_c);
         old_portc = board->_8255_8000.out_c;
     }
 

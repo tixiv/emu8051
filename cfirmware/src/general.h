@@ -4,3 +4,5 @@
 
 #define TRACE(x) DAT_EXTMEM(0xffff)=(x)
 // #define TRACE(x)
+
+#define MEASURE_RANGE DAT_EXTMEM(0X9000)

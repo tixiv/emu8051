@@ -46,14 +46,10 @@ void pulse_integrator_exact(uint16_t cycles, uint8_t value) {
     pulse_exact(2 - cycles, value);
 }
 
-void pulse_integrator_test(uint16_t cycles) {
-    pulse_integrator_exact(cycles, 0xea);
-}
-
-float integrator_reset_crude(void)
+void integrator_reset_crude(void)
 {
-    DAT_EXTMEM(0X9000) = 0x3e;
-    
+    MEASURE_RANGE = 0x3e;
+
     float v = 0;
 
     for(uint8_t i = 0; i < 5; i++) {
@@ -66,19 +62,19 @@ float integrator_reset_crude(void)
             v = -v;
         }
 
-        if (v < 100.0f) break;
+        if (v < 0.020f) break;
 
-        float cycles = 37000.0f / 10000.0f * v;
+        float cycles = 30000.0f / v;
 
         if (negative) {
+            TRACE(201);
             pulse_integrator_exact(cycles, 0xfa);
             v = -v;
         } else {
+            TRACE(202);
             pulse_integrator_exact(cycles, 0xf6);
         }
     }
-
-    return v;
 }
 
 static char buffer[10];
@@ -86,19 +82,98 @@ static char buffer[10];
 void print_number(int16_t value) {
     __itoa(value, buffer, 10);
     display_print(buffer);
+    display_put_char(' ');
 }
 
+// In pulses per integrator volt
+static float integrator_calibration[4];
+
 void integrator_calib(void) {
-    float v1 = integrator_reset_crude();
-    
-    pulse_integrator_exact(27648, 0xfa);
+    integrator_reset_crude();
+
+    read_multimeter_and_convert_result();
+    float v1 = read_multimeter_and_convert_result();
+     
+    pulse_integrator_exact(27648, 0xfa); // 30 ms
 
     read_multimeter_and_convert_result();
     float v2 = read_multimeter_and_convert_result();
 
-    float v_s = (v2 - v1) * 5.0f * 100.0f / 0.03f;
+    pulse_integrator_exact(27648, 0xf6); // 30 ms
 
+    float v_s = (v2 - v1) * 5.0f / 0.03f;
+    integrator_calibration[0] = 921600.0f / v_s;
     display_set_cursor(0, 0);
-    print_number(v_s);
+    print_number(v_s * 100.0f);
 
+    
+    read_multimeter_and_convert_result();
+    v1 = read_multimeter_and_convert_result();
+
+    MEASURE_RANGE = 0x7e;
+
+    v_s = (v1 - v2) * 5.0f / 0.03f;
+    integrator_calibration[1] = -921600.0f / v_s;
+    display_set_cursor(1, 0);
+    print_number(v_s * 100.0f);
+
+
+    for (uint8_t x=0; x<4; x++) {
+        pulse_integrator_exact(54253, 0x65);
+    }
+
+
+    read_multimeter_and_convert_result();
+    v1 = read_multimeter_and_convert_result();
+
+    pulse_integrator_exact(27648, 0xea);
+
+    read_multimeter_and_convert_result();
+    v2 = read_multimeter_and_convert_result();
+
+    pulse_integrator_exact(27648, 0xe6);
+
+    v_s = (v2 - v1) * 0.5f / 0.03f;
+    integrator_calibration[2] = 921600.0f / v_s;
+    display_set_cursor(0, 0);
+    print_number(v_s * 100.0f);
+
+    read_multimeter_and_convert_result();
+    v1 = read_multimeter_and_convert_result();
+
+    v_s = (v1 - v2) * 0.5f / 0.03f;
+    integrator_calibration[3] = -921600.0f / v_s;
+    display_set_cursor(1, 0);
+    print_number(v_s * 100.0f);
+
+    for (uint8_t x=0; x<4; x++) {
+        pulse_integrator_exact(54253, 0x65);
+    }
+}
+
+uint8_t break_cycle;
+
+void do_integrator(float diff) {
+    TRACE(3);
+	uint8_t negative = 0;
+	if (diff < 0.0f) {
+		diff = -diff;
+		negative = 1;
+	}
+
+    TRACE(diff*100.0f);
+
+	if (diff < 0.1) {
+		if (negative)
+			pulse_integrator_exact(integrator_calibration[3] * diff * 0.5f, 0xe6);
+		else
+			pulse_integrator_exact(integrator_calibration[2] * diff * 0.5f, 0xea);
+	} else {
+        break_cycle = 2;
+		if (negative)
+			pulse_integrator_exact(integrator_calibration[1] * diff, 0xf6);
+		else
+			pulse_integrator_exact(integrator_calibration[0] * diff, 0xfa);
+	}
+    TRACE(4);
 }
