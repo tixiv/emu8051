@@ -81,8 +81,6 @@ float get_float(void) {
     return 16383.0f;
 }
 
-float soll = 10000;
-
 void display_print(const char *str) {
     while (1) {
         char c = *str++;

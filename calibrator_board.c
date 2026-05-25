@@ -81,6 +81,8 @@ struct calibrator_board_t {
 
     bool open_loop;
 
+    bool interrupt;
+
     // mode 0: I Source
     // mode 1: U Source / Thermocouple
     // mode 2: XMTR
@@ -111,7 +113,7 @@ void calibrator_board_init() {
     plot_init(&board->plot);
     integrator_init(&board->integrator);
 
-    board->mode = 0;
+    board->mode = 9;
 
     board->logfile = fopen("log", "w");
 }
@@ -203,6 +205,13 @@ void logicboard_tick(struct em8051 *aCPU) {
     } else {
         aCPU->mSFR[REG_TCON] &= ~TCONMASK_IE1;
         pout[3] |= 0x08;
+    }
+
+    if (board->interrupt) {
+        aCPU->mSFR[REG_TCON] |= TCONMASK_IE0;
+        board->interrupt = false;
+    } else {
+        aCPU->mSFR[REG_TCON] &= ~TCONMASK_IE0;
     }
 
     static uint8_t old_portc;
@@ -420,6 +429,7 @@ void logicboard_editor_keys(struct em8051 *aCPU, int ch) {
         case '>':  board->integrator.akk += 0.5f; break;
         case '<':  board->integrator.akk -= 0.5f; break;
         case 'o':  board->open_loop = !board->open_loop; break;
+        case 'i':  board->interrupt = true; break;
         default:   board->new_key = ch; break;
     }
 }

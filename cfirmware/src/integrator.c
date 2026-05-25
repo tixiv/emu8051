@@ -1,6 +1,7 @@
 
 #include "general.h"
 #include "display.h"
+#include "print_number.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -77,14 +78,6 @@ void integrator_reset_crude(void)
     }
 }
 
-static char buffer[10];
-
-void print_number(int16_t value) {
-    __itoa(value, buffer, 10);
-    display_print(buffer);
-    display_put_char(' ');
-}
-
 // In pulses per integrator volt
 static float integrator_calibration[4];
 
@@ -104,7 +97,7 @@ void integrator_calib(void) {
     float v_s = (v2 - v1) * 5.0f / 0.03f;
     integrator_calibration[0] = 921600.0f / v_s;
     display_set_cursor(0, 0);
-    print_number(v_s * 100.0f);
+    print_number(v_s * 100.0f, 4);
 
     
     read_multimeter_and_convert_result();
@@ -115,7 +108,7 @@ void integrator_calib(void) {
     v_s = (v1 - v2) * 5.0f / 0.03f;
     integrator_calibration[1] = -921600.0f / v_s;
     display_set_cursor(1, 0);
-    print_number(v_s * 100.0f);
+    print_number(v_s * 100.0f, 4);
 
 
     for (uint8_t x=0; x<4; x++) {
@@ -136,7 +129,7 @@ void integrator_calib(void) {
     v_s = (v2 - v1) * 0.5f / 0.03f;
     integrator_calibration[2] = 921600.0f / v_s;
     display_set_cursor(0, 0);
-    print_number(v_s * 100.0f);
+    print_number(v_s * 1000.0f, 3);
 
     read_multimeter_and_convert_result();
     v1 = read_multimeter_and_convert_result();
@@ -144,7 +137,7 @@ void integrator_calib(void) {
     v_s = (v1 - v2) * 0.5f / 0.03f;
     integrator_calibration[3] = -921600.0f / v_s;
     display_set_cursor(1, 0);
-    print_number(v_s * 100.0f);
+    print_number(v_s * 1000.0f, 3);
 
     for (uint8_t x=0; x<4; x++) {
         pulse_integrator_exact(54253, 0x65);

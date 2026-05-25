@@ -4,6 +4,7 @@
 #include "keyboard.h"
 #include "multimeter.h"
 #include "integrator.h"
+#include "print_number.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,9 +35,38 @@ void display_i_string(uint8_t row, uint8_t idx) {
 	display_print_16(&language_table[idx * 16]);
 }
 
-uint8_t cycles = 100;
+float soll;
 
-extern void print_number(int16_t value);
+void source_loop() {
+	while(1) {
+		float v = read_multimeter_and_convert_result();
+		if (!break_cycle) {
+			float diff = soll - v;
+			do_integrator(diff * 5.0f);
+			display_set_cursor(1,0);
+			print_number(diff * 10000.0f,0);
+		} else {
+			break_cycle--;
+		}
+
+		display_set_cursor(0,0);
+		print_number(v * 10000.0f, 3);
+
+		update_keyboard();
+
+		if (key_buffer) {
+			if (key_buffer == 3) {
+				IE   = 0;
+				P1 = 0x65;
+				((void (*)(void))0xe0c8)(); // jump to original firmware start
+			}
+			else {
+				key_buffer = 0;
+				return;
+			}
+		}
+	}
+}
 
 int main(void) {
     io_init();
@@ -54,40 +84,16 @@ int main(void) {
 
 	MEASURE_RANGE = 0x5d; // measure range 15V
 
-	read_multimeter_and_convert_result();
-	read_multimeter_and_convert_result();
+	while (1) {
+		display_i_string(0, 0x38);
+		display_i_string(1, 0x39);
 
-	float soll = 1.0f;
+		soll = number_entry() * 0.1f;
 
-	while(1) {
-		float v = read_multimeter_and_convert_result();
-		if (!break_cycle) {
-			float diff = soll - v;
-			do_integrator(diff * 5.0f);
-			display_set_cursor(1,0);
-			print_number(diff * 10000.0f);
-		} else {
-			break_cycle--;
-		}
+		read_multimeter_and_convert_result();
+		read_multimeter_and_convert_result();
 
-		display_set_cursor(0,0);
-		print_number(v * 10000.0f);
-
-		update_keyboard();
-
-		if (key_buffer) {
-			if (key_buffer == 1) {
-				// Haha, this crashes sdcc: '((void *(void))0x1234)();'
-
-				IE   = 0;
-				P1 = 0x65;
-				((void (*)(void))0xe0c8)(); // jump to original firmware start
-			}
-			
-			display_set_cursor(1,15);
-			display_put_char(key_buffer);
-			key_buffer = 0;
-
-		}
+		source_loop();
 	}
+
 }
