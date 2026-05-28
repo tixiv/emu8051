@@ -50,6 +50,7 @@ void pulse_integrator_exact(uint16_t cycles, uint8_t value) {
 void integrator_reset_crude(void)
 {
     MEASURE_RANGE = 0x3e;
+    read_multimeter_and_convert_result();
 
     float v = 0;
 
@@ -68,11 +69,9 @@ void integrator_reset_crude(void)
         float cycles = 30000.0f / v;
 
         if (negative) {
-            TRACE(201);
             pulse_integrator_exact(cycles, 0xfa);
             v = -v;
         } else {
-            TRACE(202);
             pulse_integrator_exact(cycles, 0xf6);
         }
     }

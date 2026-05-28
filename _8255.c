@@ -3,6 +3,13 @@
 
 extern void trace_msg(const char *fmt, ...);
 
+static void update_out_c_latch(_8255_t *s, uint16_t address, uint8_t value) {
+    if ((address & 0x9000) == 0x8000 && ((value ^ s->out_c_latch) & 0x43)) {
+        trace_msg("out_c_latch_changed: %02X->%02x  ^=%02X", s->out_c_latch, value, s->out_c_latch ^ value);
+    }
+    s->out_c_latch = value;
+}
+
 static void update_port_c(_8255_t *s) {
     uint8_t new_out_c = s->out_c_latch;
 
@@ -49,7 +56,7 @@ void _8255_write(_8255_t *s, uint16_t reg, uint8_t value) {
     switch (reg % 4) {
         case 0: s->out_a = value; break;
         case 1: s->out_b = value; break;
-        case 2: s->out_c_latch = value; update_port_c(s) ; break;
+        case 2: update_out_c_latch(s, reg, value); update_port_c(s) ; break;
         case 3:
             if (value & 0x80) {
                 s->control = value & 0x7f;
@@ -58,9 +65,9 @@ void _8255_write(_8255_t *s, uint16_t reg, uint8_t value) {
                 int bit_num = ((value & 0x0e) >> 1);
 
                 if (value & 0x01)
-                    s->out_c_latch |= (1 << bit_num);
+                    update_out_c_latch(s, reg, s->out_c_latch | (1 << bit_num));
                 else
-                    s->out_c_latch &= ~(1 << bit_num);
+                    update_out_c_latch(s, reg, s->out_c_latch & ~(1 << bit_num));
             }
 
             update_port_c(s);

@@ -83,6 +83,7 @@ struct calibrator_board_t {
 
     bool interrupt;
 
+    // bit 0 = mode_u, bit 1= mode_xmtr, bit 2 = mode_measure, bit3 = mode_ohm
     // mode 0: I Source
     // mode 1: U Source / Thermocouple
     // mode 2: XMTR
@@ -106,6 +107,15 @@ struct calibrator_board_t {
 };
 
 static struct calibrator_board_t the_board, *board = &the_board;
+
+void next_mode() {
+    switch (board->mode) {
+        case 2: board->mode = 4; break;
+        case 5: board->mode = 9; break;
+        case 9: board->mode = 0; break;
+        default: board->mode ++; break;
+    }
+}
 
 void calibrator_board_init() {
     display_init(&board->display);
@@ -425,7 +435,7 @@ void logicboard_editor_keys(struct em8051 *aCPU, int ch) {
     switch (ch) {
         case 's': snapshot(aCPU); break;
         case 'd': diff(aCPU); break;
-        case 'M':  board->mode = (board->mode + 1) % 16; break;
+        case 'M':  next_mode(); break;
         case '>':  board->integrator.akk += 0.5f; break;
         case '<':  board->integrator.akk -= 0.5f; break;
         case 'o':  board->open_loop = !board->open_loop; break;

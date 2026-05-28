@@ -5,6 +5,7 @@
 #include "multimeter.h"
 #include "integrator.h"
 #include "print_number.h"
+#include "ui.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,16 +29,10 @@ void io_init(void) {
 
 #define TRACE_MAIN(x) TRACE(x)
 
-__code const char *language_table = (__code char*)0x6000;
-
-void display_i_string(uint8_t row, uint8_t idx) {
-	display_set_cursor(row, 0);
-	display_print_16(&language_table[idx * 16]);
-}
 
 float soll;
 
-void source_loop() {
+void source_loop(void) {
 	while(1) {
 		float v = read_multimeter_and_convert_result();
 		if (!break_cycle) {
@@ -72,8 +67,8 @@ int main(void) {
     io_init();
     display_init();
 
-	display_i_string(0, 0x00);
-	display_i_string(1, 0x0b);
+	display_indexed(0, 0x00);
+	display_indexed(1, 0x0b);
 
  	DAT_EXTMEM(0X8003) = 0x09; // Set PC4 = interrupt enable
 
@@ -85,8 +80,13 @@ int main(void) {
 	MEASURE_RANGE = 0x5d; // measure range 15V
 
 	while (1) {
-		display_i_string(0, 0x38);
-		display_i_string(1, 0x39);
+		read_multimeter_and_convert_result();
+		update_ui();
+	}
+
+	while (1) {
+		display_indexed(0, 0x38);
+		display_indexed(1, 0x39);
 
 		soll = number_entry() * 0.1f;
 
