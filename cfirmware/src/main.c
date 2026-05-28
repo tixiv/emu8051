@@ -20,11 +20,11 @@ int putchar(int c) {
 
 void io_init(void) {
     P1 = 0x65;
+	DAT_EXTMEM(0x8002) = 0x40; // keep PC6 high when going to output
     DAT_EXTMEM(0X9003) = 0x88;
     DAT_EXTMEM(0X8003) = 0xb2;
     DAT_EXTMEM(0X9000) = 0x37; // keyscan upper low, measure range
     DAT_EXTMEM(0X8003) = BIT_MOD(4, 0); // disable multimeter interrupt
-	DAT_EXTMEM(0X8003) = BIT_MOD(7, 0); // measure * 3 off
     DAT_EXTMEM(0x9002) = 0;    // keyscan lower low
 }
 

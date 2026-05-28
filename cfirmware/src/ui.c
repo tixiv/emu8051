@@ -61,15 +61,10 @@ void menu_entry_tests(void) {
 }
 
 void original_firmware(void) {
-    DAT_EXTMEM(0x8003) = BIT_MOD(6,1);
-    DAT_EXTMEM(0x8003) = BIT_MOD(1,1);
-    DAT_EXTMEM(0x8003) = BIT_MOD(0,1);
-    DAT_EXTMEM(0x8002) = 3;
-    DAT_EXTMEM(0x8002) = 1;
-    DAT_EXTMEM(0x8002) = 0;
     IE   = 0;
 	P1 = 0x65;
-	((void (*)(void))0xe0c8)(); // jump to original firmware start
+	((void (*)(void))0xfff0)(); // jump to transition asm code
+    // DAT_EXTMEM(0x8003) = BIT_MOD(6,0);
 }
 
 
