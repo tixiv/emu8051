@@ -65,6 +65,7 @@ typedef uint8_t (*em8051xread)(struct em8051 *aCPU, uint16_t aAddress);
 
 struct em8051
 {
+    unsigned char *romImage;
     unsigned char *mCodeMem; // 1k - 64k, must be power of 2
     uint16_t mCodeMemMaxIdx;
     unsigned char *mExtData; // 0 - 64k, must be power of 2
@@ -112,6 +113,8 @@ uint8_t decode(struct em8051 *aCPU, uint16_t aPosition, char *aBuffer);
 
 // Load an intel hex format object file. Returns negative for errors.
 int load_obj(struct em8051 *aCPU, char *aFilename);
+
+int load_bin(struct em8051 *aCPU, char *aFilename);
 
 // Alternate way to execute an opcode (switch-structure instead of function pointers)
 uint8_t do_op(struct em8051 *aCPU);

@@ -23,7 +23,8 @@ void io_init(void) {
     DAT_EXTMEM(0X9003) = 0x88;
     DAT_EXTMEM(0X8003) = 0xb2;
     DAT_EXTMEM(0X9000) = 0x37; // keyscan upper low, measure range
-    DAT_EXTMEM(0X8003) = 8;    // disable multimeter ineterrupt
+    DAT_EXTMEM(0X8003) = BIT_MOD(4, 0); // disable multimeter interrupt
+	DAT_EXTMEM(0X8003) = BIT_MOD(7, 0); // measure * 3 off
     DAT_EXTMEM(0x9002) = 0;    // keyscan lower low
 }
 
@@ -76,6 +77,8 @@ int main(void) {
 	IE   = 0x84;   // enable INT1 + global
 
 	integrator_calib();
+
+	init_ui();
 
 	MEASURE_RANGE = 0x5d; // measure range 15V
 

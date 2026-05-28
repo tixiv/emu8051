@@ -27,6 +27,14 @@ static void update_port_c(_8255_t *s) {
     s->out_c = new_out_c;
 }
 
+void _8255_init(_8255_t *s) {
+    s->out_c = s->out_c_latch = 0xff;
+    s->out_b = 0xff;
+    s->out_a = 0xff;
+    s->IBFA = 0;
+    s->control = 0;
+}
+
 uint8_t _8255_read(_8255_t *s, uint16_t reg) {
     switch (reg % 4) {
         case 0:

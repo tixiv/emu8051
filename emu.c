@@ -286,7 +286,8 @@ int main(int parc, char ** pars)
 
     memset(&emu, 0, sizeof(emu));
     emu.mCodeMemMaxIdx = 65536-1;
-    emu.mCodeMem     = calloc(emu.mCodeMemMaxIdx+1, sizeof(unsigned char));
+    emu.romImage     = calloc(0x20000, sizeof(unsigned char));
+    emu.mCodeMem     = emu.romImage + 0x10000;
     emu.mExtDataMaxIdx = 65536-1;
     emu.mExtData     = calloc(emu.mExtDataMaxIdx+1, sizeof(unsigned char));
     emu.mUpperData   = calloc(128, sizeof(unsigned char));
@@ -423,7 +424,7 @@ int main(int parc, char ** pars)
             }
             else
             {
-                if (load_obj(&emu, pars[i]) != 0)
+                if (load_bin(&emu, pars[i]) != 0)
                 {
                     printf("File '%s' load failure\n\n",pars[i]);
                     return -1;
@@ -735,7 +736,8 @@ int load_obj(struct em8051 *aCPU, char *aFilename)
         {
             int data = readbyte(f);
             checksum += data;
-            aCPU->mCodeMem[address + i] = data;
+            aCPU->romImage[address + i] = data;
+            aCPU->romImage[address + 0x10000 + i] = data;
         }
         i = readbyte(f);
         checksum &= 0xff;
@@ -746,4 +748,27 @@ int load_obj(struct em8051 *aCPU, char *aFilename)
     }
 	  fclose(f);
     return -5;
+}
+
+int load_bin(struct em8051 *aCPU, char *aFilename)
+{
+    FILE *f;
+    if (aFilename == 0 || aFilename[0] == 0)
+        return -1;
+    f = fopen(aFilename, "r");
+    if (!f) return -1;
+
+    int size_read = fread(aCPU->romImage, 1, 0x20000, f);
+    
+    fclose(f);
+
+    if (size_read < 0) {    
+        return -1;
+    }
+
+    if (size_read <= 0x10000) {
+        memcpy(aCPU->romImage + 0x10000, aCPU->romImage, 0x10000);
+    }
+    
+    return 0;
 }

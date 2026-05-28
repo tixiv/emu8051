@@ -38,6 +38,7 @@ typedef struct {
     bool IBFA;
 } _8255_t;
 
+void _8255_init(_8255_t *s) ;
 uint8_t _8255_read(_8255_t *s, uint16_t reg);
 void _8255_write(_8255_t *s, uint16_t reg, uint8_t value);
 void _8255_porta_strobed_input(_8255_t *s, uint8_t value);

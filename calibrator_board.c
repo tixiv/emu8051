@@ -118,6 +118,8 @@ void next_mode() {
 }
 
 void calibrator_board_init() {
+    _8255_init(&board->_8255_8000);
+    _8255_init(&board->_8255_9000);
     display_init(&board->display);
     multimeter_init(&board->multimeter);
     plot_init(&board->plot);
@@ -288,6 +290,7 @@ void calibrator_xwrite(struct em8051 *aCPU, uint16_t address, uint8_t value) {
 
     if ((address & 0xfffc) == 0x8000) {
         _8255_write(&board->_8255_8000, address, value);
+        aCPU->mCodeMem = aCPU->romImage + ((board->_8255_8000.out_c & 0x40) ? 0x10000 : 0);
     }
     else if ((address & 0xfffc) == 0x9000) {
         _8255_write(&board->_8255_9000, address, value);
