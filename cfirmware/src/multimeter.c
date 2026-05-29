@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <8051.h>
 
+float latest_measurement;
+
 volatile uint8_t multimeter_state;
 
 uint8_t multimeter_digits[5];
@@ -32,7 +34,7 @@ void int1_isr(void) __interrupt (2)
 
 static char buff[7]; // "-12345\x00"
 
-float read_multimeter_and_convert_result(void) {
+void read_multimeter_and_convert_result(void) {
 	TRACE(1);
 	while(multimeter_state != 6);
 
@@ -41,12 +43,14 @@ float read_multimeter_and_convert_result(void) {
 	if (multimeter_digits[0] & 0x04) { // overload
 		if (multimeter_digits[0] & 0x08) {
 			multimeter_state = 0; // can't put the reset before the if because it invalidates digits[0]
-			return 2.22222f;
+			latest_measurement = 2.22222f;
+			return;
 		}			
 		else
 		{
 			multimeter_state = 0; // can't put the reset before the if because it invalidates digits[0]
-			return -2.22222f;
+			latest_measurement = -2.22222f;
+			return;
 		}
 	}
 
@@ -64,5 +68,5 @@ float read_multimeter_and_convert_result(void) {
 
 	float v = atoi(buff);
 	
-    return v * (1.1f / 10000.0f);
+    latest_measurement = v * (1.1f / 10000.0f);
 }

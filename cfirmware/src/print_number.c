@@ -50,7 +50,6 @@ void print_number(int16_t value, uint8_t dp) {
     display_put_char(' ');
 }
 
-
 float number_entry() {
     uint8_t pos = 0;
 

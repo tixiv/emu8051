@@ -2,6 +2,7 @@
 #include "general.h"
 #include "display.h"
 #include "print_number.h"
+#include "measure_range.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -49,14 +50,15 @@ void pulse_integrator_exact(uint16_t cycles, uint8_t value) {
 
 void integrator_reset_crude(void)
 {
-    MEASURE_RANGE = 0x3e;
+    set_measure_range(MR_Int_x0_2);
     read_multimeter_and_convert_result();
 
     float v = 0;
 
     for(uint8_t i = 0; i < 5; i++) {
         read_multimeter_and_convert_result();
-        v = read_multimeter_and_convert_result();
+        read_multimeter_and_convert_result();
+        v = latest_measurement;
 
         uint8_t negative = 0;
         if (v < 0) {
@@ -84,13 +86,15 @@ void integrator_calib(void) {
     integrator_reset_crude();
 
     read_multimeter_and_convert_result();
-    float v1 = read_multimeter_and_convert_result();
+    read_multimeter_and_convert_result();
+    float v1 = latest_measurement;
      
     pulse_integrator_exact(27648, 0xfa); // 30 ms
 
     read_multimeter_and_convert_result();
-    float v2 = read_multimeter_and_convert_result();
-
+    read_multimeter_and_convert_result();
+    float v2 = latest_measurement;
+    
     pulse_integrator_exact(27648, 0xf6); // 30 ms
 
     float v_s = (v2 - v1) * 5.0f / 0.03f;
@@ -100,7 +104,8 @@ void integrator_calib(void) {
 
     
     read_multimeter_and_convert_result();
-    v1 = read_multimeter_and_convert_result();
+    read_multimeter_and_convert_result();
+    v1 = latest_measurement;
 
     MEASURE_RANGE = 0x7e;
 
@@ -116,12 +121,14 @@ void integrator_calib(void) {
 
 
     read_multimeter_and_convert_result();
-    v1 = read_multimeter_and_convert_result();
+    read_multimeter_and_convert_result();
+    v1 = latest_measurement;
 
     pulse_integrator_exact(27648, 0xea);
 
     read_multimeter_and_convert_result();
-    v2 = read_multimeter_and_convert_result();
+    read_multimeter_and_convert_result();
+    v2 = latest_measurement;
 
     pulse_integrator_exact(27648, 0xe6);
 
@@ -131,7 +138,8 @@ void integrator_calib(void) {
     print_number(v_s * 1000.0f, 3);
 
     read_multimeter_and_convert_result();
-    v1 = read_multimeter_and_convert_result();
+    read_multimeter_and_convert_result();
+    v1 = latest_measurement;
 
     v_s = (v1 - v2) * 0.5f / 0.03f;
     integrator_calibration[3] = -921600.0f / v_s;

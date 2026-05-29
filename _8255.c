@@ -4,7 +4,7 @@
 extern void trace_msg(const char *fmt, ...);
 
 static void update_out_c_latch(_8255_t *s, uint16_t address, uint8_t value) {
-    if ((address & 0x9000) == 0x8000 && ((value ^ s->out_c_latch) & 0x43)) {
+    if ((address & 0x9000) == 0x8000 && ((value ^ s->out_c_latch) & 0xC3)) {
         trace_msg("out_c_latch_changed: %02X->%02x  ^=%02X", s->out_c_latch, value, s->out_c_latch ^ value);
     }
     s->out_c_latch = value;
@@ -68,6 +68,10 @@ void _8255_write(_8255_t *s, uint16_t reg, uint8_t value) {
         case 3:
             if (value & 0x80) {
                 s->control = value & 0x7f;
+                // control word set resets the output latches on my 8255
+                s->out_a = 0;
+                s->out_b = 0;
+                s->out_c = s->out_c_latch = 0;
             } else {
                 // bit mod PORTC
                 int bit_num = ((value & 0x0e) >> 1);

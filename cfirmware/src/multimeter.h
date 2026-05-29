@@ -3,4 +3,7 @@
 // jump to the ISR will be put into the vector table.
 void int1_isr(void) __interrupt (2);
 
-float read_multimeter_and_convert_result(void);
+void read_multimeter_and_convert_result(void);
+
+// latest multimeter measurement in volt (2.2 V full scale)
+extern float latest_measurement;

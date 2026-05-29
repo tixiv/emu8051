@@ -29,20 +29,20 @@ typedef struct {
 
 void io_board_tick(io_board_t *iob, float integrator_voltage, uint8_t range, bool open_loop) {
     // Ranges:
-    //       M*10 Val GND Batt Temp  Sel Ctrl/10                    Int V  ->  Out   -> measure
-    // 0x5f    1   0   1    1    1    1    1      -> Source 20 mA     10 V -> 20 mA  -> 2.00 V
-    //                                            -> Source 200 mV    10 V -> 200 mV -> 2.00 V
-    // 0x1e    0   0   1    1    1    1    0      -> Source 52 mA    2.6 V -> 52 mA  -> 0.52 V
-    //                                            -> Source 2 V       10 V ->  2 V   -> 2.00 V
-    // 0x5d    1   0   1    1    1    0    1      -> Source 15 V      7.5V ->  15 V  -> 1.50 V
-    //                                            -> R 5 k
-    // 0x1f    0   0   1    1    1    1    1      -> Measure 52 mA
-    // 0x1d    0   0   1    1    1    0    1      -> Measure 42 V
-    // 0x6f    1   1   0    1    1    1    1      -> Measure GND * 10
-    // 0x2f    0   1   0    1    1    1    1      -> Measure GND
-    // 0x3f    0   1   1    1    1    1    1      -> Measure Integrator 10V -> (0.2V)  -> 0.20v
-    // 0x3e    0   1   1    1    1    1    0      -> Measure Integrator 10V ->  (2V)   -> 2.00v
-    // 0x7e    1   1   1    1    1    1    0      -> Measure Integrator  1V -> (0.2V)   -> 2.00v
+    //       M*10 Val GND Batt Temp  V/100 Ctrl/10                    Int V  ->  Out   -> measure
+    // 0x5f    1   0   1    1    1    1       1      -> Source 20 mA     10 V -> 20 mA  -> 2.00 V
+    //                                               -> Source 200 mV    10 V -> 200 mV -> 2.00 V
+    // 0x1e    0   0   1    1    1    1       0      -> Source 52 mA    2.6 V -> 52 mA  -> 0.52 V
+    //                                               -> Source 2 V       10 V ->  2 V   -> 2.00 V
+    // 0x5d    1   0   1    1    1    0       1      -> Source 15 V      7.5V ->  15 V  -> 1.50 V
+    //                                               -> R 5 k
+    // 0x1f    0   0   1    1    1    1       1      -> Measure 52 mA
+    // 0x1d    0   0   1    1    1    0       1      -> Measure 42 V
+    // 0x6f    1   1   0    1    1    1       1      -> Measure GND * 10
+    // 0x2f    0   1   0    1    1    1       1      -> Measure GND
+    // 0x3f    0   1   1    1    1    1       1      -> Measure Integrator 10V -> (0.2V)  -> 0.20v
+    // 0x3e    0   1   1    1    1    1       0      -> Measure Integrator 10V ->  (2V)   -> 2.00v
+    // 0x7e    1   1   1    1    1    1       0      -> Measure Integrator  1V -> (0.2V)  -> 2.00v
 
     float measure_mult = (range & 0x40) ? 10.0f : 1.0f;
     float control_mult = (range & 0x01) ? .02f : .2f;
