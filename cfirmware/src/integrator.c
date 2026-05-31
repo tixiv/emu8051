@@ -80,9 +80,9 @@ void integrator_reset_crude(void)
 }
 
 // In pulses per integrator volt
-static float integrator_calibration[4];
+float integrator_calibration[4];
 
-void integrator_calib(void) {
+void do_integrator_calibration(void) {
     integrator_reset_crude();
 
     read_multimeter_and_convert_result();
@@ -149,31 +149,4 @@ void integrator_calib(void) {
     for (uint8_t x=0; x<4; x++) {
         pulse_integrator_exact(54253, 0x65);
     }
-}
-
-uint8_t break_cycle;
-
-void do_integrator(float diff) {
-    TRACE(3);
-	uint8_t negative = 0;
-	if (diff < 0.0f) {
-		diff = -diff;
-		negative = 1;
-	}
-
-    TRACE(diff*100.0f);
-
-	if (diff < 0.1) {
-		if (negative)
-			pulse_integrator_exact(integrator_calibration[3] * diff * 0.5f, 0xe6);
-		else
-			pulse_integrator_exact(integrator_calibration[2] * diff * 0.5f, 0xea);
-	} else {
-        break_cycle = 2;
-		if (negative)
-			pulse_integrator_exact(integrator_calibration[1] * diff, 0xf6);
-		else
-			pulse_integrator_exact(integrator_calibration[0] * diff, 0xfa);
-	}
-    TRACE(4);
 }

@@ -7,6 +7,7 @@
 #include "print_number.h"
 #include "ui.h"
 #include "measure_range.h"
+#include "source.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,40 +28,6 @@ void io_init(void) {
     DAT_EXTMEM(0x9002) = 0;    // keyscan lower low
 }
 
-float soll;
-
-void source_loop(void) {
-	while(1) {
-		read_multimeter_and_convert_result();
-    	float v = latest_measurement;
-		if (!break_cycle) {
-			float diff = soll - v;
-			do_integrator(diff * 5.0f);
-			display_set_cursor(1,0);
-			print_number(diff * 10000.0f,0);
-		} else {
-			break_cycle--;
-		}
-
-		display_set_cursor(0,0);
-		print_number(v * 10000.0f, 3);
-
-		update_keyboard();
-
-		if (key_buffer) {
-			if (key_buffer == 3) {
-				IE   = 0;
-				P1 = 0x65;
-				((void (*)(void))0xe0c8)(); // jump to original firmware start
-			}
-			else {
-				key_buffer = 0;
-				return;
-			}
-		}
-	}
-}
-
 int main(void) {
     io_init();
     display_init();
@@ -73,27 +40,15 @@ int main(void) {
 	TCON = 0x00;  // level triggered INT1
 	IE   = 0x84;   // enable INT1 + global
 
-	integrator_calib();
+	do_integrator_calibration();
+
+	set_measure_range(MR_Int_x0_2);
 
 	init_ui();
 
-	set_measure_range(MR_15V);
-
 	while (1) {
 		read_multimeter_and_convert_result();
+		source_update();
 		update_ui();
 	}
-
-	while (1) {
-		display_indexed(0, 0x38);
-		display_indexed(1, 0x39);
-
-		soll = number_entry() * 0.1f;
-
-		read_multimeter_and_convert_result();
-		read_multimeter_and_convert_result();
-
-		source_loop();
-	}
-
 }

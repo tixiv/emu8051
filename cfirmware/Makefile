@@ -4,7 +4,7 @@ SRC_DIR = src
 BUILD_DIR = build
 
 CC = sdcc
-CFLAGS = -mmcs51 --model-medium --std=c99 --debug --xram-loc 0x0000 --xram-size 0x2000 --code-loc 0x0000
+CFLAGS = -mmcs51 --model-medium --std=c99 --Werror --debug --xram-loc 0x0000 --xram-size 0x2000 --code-loc 0x0000
 AS = sdas8051
 ASFLAGS = -l
 

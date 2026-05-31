@@ -49,34 +49,3 @@ void print_number(int16_t value, uint8_t dp) {
     display_print(buffer);
     display_put_char(' ');
 }
-
-float number_entry() {
-    uint8_t pos = 0;
-
-    display_set_cursor(0, 10);
-
-    while (1) {
-        update_keyboard();
-
-        if (key_buffer) {
-            if ((key_buffer & 0x30) && pos < 6) {
-                buffer[pos++] = key_buffer;
-                display_put_char(key_buffer);
-            }
-            if (key_buffer == 2 && pos > 0) {
-                pos--;
-                buffer[pos] = 0;
-                display_set_cursor(0, 10 + pos);
-                display_put_char(' ');
-                display_set_cursor(0, 10 + pos);
-            }
-            if (key_buffer == 1) {
-                key_buffer = 0;
-                buffer[pos] = 0;
-                return atof(buffer);
-            }
-
-            key_buffer = 0;
-        }
-    }
-}

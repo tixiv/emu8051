@@ -5,37 +5,22 @@
 #include "general.h"
 #include "measure_range.h"
 #include "multimeter.h"
+#include "numeric_entry.h"
+#include "ui_util.h"
+#include "test_screen.h"
+#include "source.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <8051.h>
 
-__code const char *language_table = (__code char*)0x6000;
-
-
-void display_indexed(uint8_t row, uint8_t idx) {
-	display_set_cursor(row, 0);
-	display_print_16(&language_table[idx * 16]);
-}
-
-void display_string(uint8_t row, __code const char *str) {
-    if (str < (__code const char *)0x100) {
-        display_indexed(row, (uint8_t)str);
-    } else {
-        display_set_cursor(row, 0);
-        display_print(str);
-        uint8_t len = strlen(str);
-        while(len++ < 16)
-            display_put_char(' ');
-    }
-}
-
-
 uint8_t current_screen;
 enum Screen {
     SCR_MAIN_MENU = 0,
     SCR_SUB_MENU  = 1,
-    SCR_TESTS  = 2,
+    SCR_SOURCE = 2,
+    SCR_TESTS  = 3,
+    SCR_NUMERIC_ENTRY = 4,
 };
 
 typedef void(*handler_t)(void) ;
@@ -52,37 +37,10 @@ typedef struct {
     menu_entry_t entries[];
 } menu_t;
 
-menu_t *current_sub_menu;
-
-void menu_entry_volt(void) {
-
-}
-
-void menu_entry_tests(void) {
-    current_screen = SCR_TESTS;
-}
-
-void original_firmware(void) {
-    IE   = 0;
-	((void (*)(void))0xffe8)(); // jump to transition asm code
-}
-
-
-menu_t main_menu = {
-    (__code const char*)0x8d, 4, 0, {
-        {(__code const char*)0x67, menu_entry_volt},
-        {(__code const char*)0x68, menu_entry_volt},
-        {"Tests", menu_entry_tests},
-        {"Original Firmw.", original_firmware}
-    }
-};
-
-
 void draw_menu(menu_t *menu) {
     display_string(0, menu->title);
     display_string(1, menu->entries[menu->idx].name);
 }
-
 
 uint8_t update_menu(menu_t *menu) {
     switch (key_buffer) {
@@ -103,65 +61,131 @@ uint8_t update_menu(menu_t *menu) {
     return 0;
 }
 
-void return_to_main_menu() {
+menu_t *current_sub_menu;
+uint8_t ui_current_range;
+
+
+typedef struct {
+    uint8_t str_title;
+    uint8_t str_entry_0;
+    uint8_t str_entry_1;
+    uint8_t range;
+    float   multiplier;
+    uint8_t dp;
+} ui_range_t;
+
+__code ui_range_t ranges[] = {
+    {0xa5, 0x38, 0x39, MR_15V,        10.0f,  3},
+    {0xa7, 0x3e, 0x3f, MR_2V_52mA,    1.0f,   2},
+    {0xa9, 0x44, 0x45, MR_200mV_20mA, 100.0f, 4},
+};
+
+void enter_source_numeric_entry(void) {
+    display_indexed(0, ranges[ui_current_range].str_entry_0);
+    display_indexed(1, ranges[ui_current_range].str_entry_1);
+    current_screen = SCR_NUMERIC_ENTRY;
+    numeric_entry_init();
+}
+
+float val_to_hw;
+
+void enter_source(void) {
+    val_to_hw = 1.0f / ranges[ui_current_range].multiplier;
+
+    enter_source_numeric_entry();
+}
+
+void numeric_entry_enter_pressed(void) {
+    set_measure_range(ranges[ui_current_range].range);
+    source_target = numeric_entry_value * val_to_hw;
+    source_start();
+    current_screen = SCR_SOURCE;
+}
+
+uint8_t update_source_screen(void) {
+    switch (key_buffer) {
+        case KEY_ESC :
+            set_measure_range(MR_Int_x0_2);
+            source_target = 0.0f;
+            return KEY_ESC;
+        case 0: break;
+    
+        default:
+            enter_source_numeric_entry();
+            return 0;
+    }
+    
+    display_indexed(0, ranges[ui_current_range].str_title);
+
+    display_set_cursor(1, 0);
+    display_print(" D   ");
+    print_number(latest_measurement * 10000.0f, ranges[ui_current_range].dp);
+    display_print("     ");
+
+    return 0;
+}
+
+void enter_volt_source_15V(void) {
+    ui_current_range = 0;
+    enter_source();
+}
+
+void enter_volt_source_2V(void) {
+    ui_current_range = 1;
+    enter_source();
+}
+
+void enter_volt_source_200mV(void) {
+    ui_current_range = 2;
+    enter_source();
+}
+
+menu_t sub_menu_volt_source = {
+    INT_STRING(0x91), 3, 0, {
+        {INT_STRING(0x9b), enter_volt_source_15V},
+        {INT_STRING(0x9a), enter_volt_source_2V},
+        {INT_STRING(0x99), enter_volt_source_200mV},
+    }
+};
+
+
+void menu_entry_volt_source(void) {
+    current_screen = SCR_SUB_MENU;
+    current_sub_menu = &sub_menu_volt_source;
+    draw_menu(current_sub_menu);
+}
+
+void menu_entry_tc_source(void) {
+
+}
+
+void menu_entry_tests(void) {
+    current_screen = SCR_TESTS;
+}
+
+void original_firmware(void) {
+    IE   = 0;
+	((void (*)(void))0xffe8)(); // jump to transition asm code
+}
+
+
+menu_t main_menu = {
+    INT_STRING(0x8d), 4, 0, {
+        {INT_STRING(0x67), menu_entry_volt_source},
+        {INT_STRING(0x68), menu_entry_tc_source},
+        {"Tests", menu_entry_tests},
+        {"Original Firmw.", original_firmware}
+    }
+};
+
+void return_to_main_menu(void) {
     current_screen = SCR_MAIN_MENU;
     draw_menu(&main_menu);
 }
 
-struct  {
-    uint8_t range;
-    __code const char *name;    
-} __code ranges[] = {
-    { MR_Batt,       "Range: Battery" },
-    { MR_Temp,       "Range: Temperature" },
-    { MR_15V,        "Range: 15V" },
-    { MR_2V_52mA,    "Range: 2V / 52mA" },
-    { MR_200mV_20mA, "Range:200mV/20mA" },
-    { MR_Int_x0_2,   "Range: Int * 0.2" },
-    { MR_Int_x2,     "Range: Int * 2.0" },
-    { MR_Int_x6,     "Range: Int * 6.0" },
-    { MR_GND,        "Range: GND" },
-    { MR_GND_x10,    "Range: GND * 10" },
-    { MR_GND_x30,    "Range: GND * 30" },
-};
-
-uint8_t range_idx;
-
-void update_tests(void) {
-    switch (key_buffer) {
-        case KEY_MENU:
-        case '0':
-            range_idx++;
-            if (range_idx >= ARRAY_SIZE(ranges))
-                range_idx = 0;
-            break;
-        case '8':
-            range_idx--;
-            if (range_idx >= ARRAY_SIZE(ranges))
-                range_idx = ARRAY_SIZE(ranges) - 1;
-            break;
-        case KEY_ESC:
-            return_to_main_menu();
-            return;
-    }
-
-    set_measure_range(ranges[range_idx].range);
-
-    switch (current_key) {
-        case '7': P1 = 0xb7; break;
-        case '9': P1 = 0xbb; break;
-        case '4': P1 = 0xc7; break;
-        case '6': P1 = 0xcb; break;
-        case '1': P1 = 0xa7; break;
-        case '3': P1 = 0xab; break;
-        case '-': P1 = 0x67; break;
-        case '.': P1 = 0x6b; break;
-        default: P1 = 0x65; break;
-    }
-
-    display_set_cursor(1, 0);
-    print_number (latest_measurement * 10000.0f, 2);
-    display_string(0, ranges[range_idx].name);
+void return_to_sub_menu(void) {
+    current_screen = SCR_SUB_MENU;
+    draw_menu(current_sub_menu);
 }
 
 void update_ui(void) {
@@ -180,7 +204,22 @@ void update_ui(void) {
             }
         } break;
         case SCR_TESTS: {
-            update_tests();
+            uint8_t res = test_screen_update();
+            if (res)
+                return_to_main_menu();
+        } break;
+        case SCR_NUMERIC_ENTRY: {
+            uint8_t res = numeric_entry_update();
+            if (res == KEY_ESC)
+                return_to_sub_menu();
+            if (res == KEY_ENTER)
+                numeric_entry_enter_pressed();
+            
+        } break;
+        case SCR_SOURCE: {
+             uint8_t res = update_source_screen();     
+             if (res == KEY_ESC)
+                return_to_sub_menu();       
         } break;
     }
 
