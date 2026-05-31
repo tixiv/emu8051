@@ -1,0 +1,23 @@
+
+#include "ui_util.h"
+#include "keyboard.h"
+#include <stdint.h>
+
+typedef void(*handler_t)(void) ;
+
+typedef struct {
+    __code const char *name;
+    handler_t handler;
+} menu_entry_t;
+
+typedef struct {
+    __code const char *title;
+    uint8_t num_entries;
+    menu_entry_t entries[];
+} menu_t;
+
+void menu_init(__code const menu_t *root_menu);
+void enter_sub_menu(__code const menu_t *menu);
+void redraw_menu(void);
+
+uint8_t update_menu(void);
