@@ -11,6 +11,7 @@
 #define MR_select_Batt  0x34
 #define MR_select_Temp  0x38
 
+#define MR_42V        (MR_select_Value | MR_Ctrl_div_10)
 #define MR_15V        (MR_select_Value | MR_x10 | MR_Ctrl_div_10)
 #define MR_2V_52mA    (MR_select_Value | MR_N_div_100)
 #define MR_200mV_20mA (MR_select_Value | MR_N_div_100 | MR_x10 | MR_Ctrl_div_10)

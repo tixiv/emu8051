@@ -10,6 +10,7 @@
 #include "test_screen.h"
 #include "source.h"
 #include "menu.h"
+#include "measure_screen.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -21,6 +22,7 @@ enum Screen {
     SCR_SOURCE = 1,
     SCR_TESTS  = 2,
     SCR_NUMERIC_ENTRY = 3,
+    SCR_MEASURE = 4,
 };
 
 uint8_t ui_current_range;
@@ -158,6 +160,22 @@ __code menu_t main_menu_current_source = {
     }
 };
 
+__code measure_screen_t measure_screen_mA = {
+    2, {
+        {0x70, -4, MR_2V_52mA},
+        {0x6f, -3, MR_200mV_20mA},
+    }
+};
+
+__code measure_screen_t measure_screen_V = {
+    4, {
+        {0x13, 4, MR_42V},
+        {0x9b, 3, MR_15V},
+        {0x9a, 2, MR_2V_52mA},
+        {0x99, 4, MR_200mV_20mA},
+    }
+};
+
 void return_to_menu(void) {
     current_screen = SCR_MENU;
     redraw_menu();
@@ -188,6 +206,9 @@ void update_ui(void) {
              if (res == KEY_ESC)
                 return_to_menu();       
         } break;
+        case SCR_MEASURE: {
+            measure_screen_update();     
+        } break;
     }
 
     key_buffer = 0;
@@ -201,11 +222,23 @@ void update_switch_posistion(void) {
 
 void init_ui(void) {
     update_switch_posistion();
-    __code const menu_t *main_menu;
     switch (switch_posistion) {
-        case 0: main_menu = &main_menu_current_source; break;
-        case 1: main_menu = &main_menu_volt_source; break;
-        default: main_menu = &main_menu_volt_source; break;
+        default:
+        case 0:
+            menu_init(&main_menu_current_source);
+            current_screen = SCR_MENU;
+            break;
+        case 1:
+            menu_init(&main_menu_volt_source);
+            current_screen = SCR_MENU;
+            break;
+        case 4:
+            measure_screen_set(&measure_screen_mA);
+            current_screen = SCR_MEASURE;
+            break;
+        case 5:
+            measure_screen_set(&measure_screen_V);
+            current_screen = SCR_MEASURE;
+            break;
     }
-    menu_init(main_menu);
 }
