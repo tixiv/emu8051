@@ -18,7 +18,7 @@ RELFILES += $(patsubst $(SRC_DIR)/%.a51,$(BUILD_DIR)/%.rel,$(AS_SRCS))
 IHX = $(BUILD_DIR)/$(TARGET).ihx
 HEX = $(BUILD_DIR)/$(TARGET).hex
 
-all: $(HEX) report
+all: $(HEX)
 
 # Create build dir
 $(BUILD_DIR):
@@ -38,8 +38,6 @@ $(IHX): $(RELFILES)
 # Convert IHX -> HEX
 $(HEX): $(IHX)
 	packihx $< > $@
-
-report: $(HEX)
 	cat $(BUILD_DIR)/$(TARGET).mem
 
 clean:

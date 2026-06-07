@@ -492,12 +492,65 @@ void trace_multimeter_read_and_convert(struct em8051 *aCPU) {
               get_caller(aCPU), *(float *)&xram[0x187c], board->_8255_9000.out_a & 0x7f);
 }
 
+bool should_trace_math(uint16_t called_from) {
+    if (0x02b1 <= called_from && called_from <= 0x323) return false; // polynom iteration
+
+    return true;
+}
+
 void trace_math_op(struct em8051 *aCPU) {
     uint16_t p = aCPU->mLowerData[0x3f] << 8 | aCPU->mLowerData[0x40];
     float v = *(float *)&xram[p];
 
-    trace_msg("trace math op from %4x fac = %f, argument = %f, result = %2x %2x\n",
+    trace_msg("%04x: float_compare(%f, %f) -> %2x %2x\n",
               get_caller(aCPU), read_fac(aCPU), v, xram[0x70], xram[0x71]);
+}
+
+void trace_load_fp_akk_from_rom_or_ext(struct em8051 *aCPU) {
+    uint16_t p = aCPU->mLowerData[0x3f] << 8 | aCPU->mLowerData[0x40];
+
+    bool from_rom = aCPU->mLowerData[0x20] & (1<<5);
+
+    float v = from_rom ? *(float *)&aCPU->mCodeMem[p] : *(float *)&xram[p];
+
+    trace_msg("%04x: fp_akk = %s[%04x] -> %f",
+              get_caller(aCPU), from_rom ? "CODE" : "EXTMEM", p, v);
+}
+
+void trace_strore_fp_akk(struct em8051 *aCPU) {
+    uint16_t p = aCPU->mLowerData[0x3f] << 8 | aCPU->mLowerData[0x40];
+
+    float v = *(float *)&xram[p];
+
+    trace_msg("%04x: EXTMEM[%04x] = %f",
+              get_caller(aCPU), p, v);
+}
+
+void trace_fp_mul(struct em8051 *aCPU) {
+    uint16_t p = aCPU->mLowerData[0x3f] << 8 | aCPU->mLowerData[0x40];
+
+    float v = *(float *)&xram[p];
+
+    trace_msg("%04x: fp_akk = %f * %f -> %f",
+              get_caller(aCPU), read_fac(aCPU), v, read_fac(aCPU) * v);
+}
+
+void trace_fp_add(struct em8051 *aCPU) {
+    uint16_t p = aCPU->mLowerData[0x3f] << 8 | aCPU->mLowerData[0x40];
+
+    float v = *(float *)&xram[p];
+
+    trace_msg("%04x: fp_akk = %f + %f -> %f",
+              get_caller(aCPU), read_fac(aCPU), v, read_fac(aCPU) + v);
+}
+
+void trace_polynom_calculation(struct em8051 *aCPU) {
+    trace_msg("polynom_calculation EXTMEM[1a57]=%d, EXTMEM[1a59]=%d, EXTMEM[1a5a]=%d, val=%f",
+        xram[0x1a57], xram[0x1a59], xram[0x1a5a], *(float*)&xram[0x1a5d]);
+}
+
+void trace_polynom_calculation_exit(struct em8051 *aCPU) {
+    trace_msg("polynom_calculation finished -> %f", *(float*)&xram[0x1a61]);
 }
 
 void trace_fun762(struct em8051 *aCPU) {
@@ -514,17 +567,30 @@ void trace_codemem_acces(struct em8051 *aCPU, uint16_t addr) {
 void trace_pc(struct em8051 *aCPU) {
     uint16_t pc = aCPU->mPC;
 
-    if (0) {
+    if (should_trace_math(get_caller(aCPU))) {
         switch (pc) {
             case 0xe00a: trace_math_op(aCPU); break;
             case 0x07c5: trace_fun762(aCPU); break;
-            case 0xddca: trace_multimeter_read(aCPU); break;
-            case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
+            case 0xdfbb: trace_load_fp_akk_from_rom_or_ext(aCPU); break;
+            case 0xdfce: trace_strore_fp_akk(aCPU); break;
+            case 0xdfd9: trace_fp_mul(aCPU); break;
+            case 0xdfcf: trace_fp_add(aCPU); break;
+
+            
+
+            
         }
     }
+    switch (pc) {
+        case 0x02a6: trace_polynom_calculation(aCPU); break;
+        case 0x0342: trace_polynom_calculation_exit(aCPU); break;
+    }
+
 
     if (0) {
         switch (pc) {
+            case 0xddca: trace_multimeter_read(aCPU); break;
+            case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
         }
 
         bool my_code = true;

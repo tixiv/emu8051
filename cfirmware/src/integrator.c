@@ -55,24 +55,23 @@ void integrator_reset_crude(void)
 
     float v = 0;
 
-    for(uint8_t i = 0; i < 5; i++) {
+    for(uint8_t i = 0; i < 6; i++) {
         read_multimeter_and_convert_result();
         read_multimeter_and_convert_result();
         v = latest_measurement;
-
+        
         uint8_t negative = 0;
-        if (v < 0) {
+        if (v < 0.0f) {
             negative = 1;
             v = -v;
         }
 
-        if (v < 0.020f) break;
+        if (v < 0.0020f) break;
 
-        float cycles = 30000.0f / v;
+        float cycles = 30000.0f * v;
 
         if (negative) {
             pulse_integrator_exact(cycles, 0xfa);
-            v = -v;
         } else {
             pulse_integrator_exact(cycles, 0xf6);
         }

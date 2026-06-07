@@ -13,17 +13,23 @@ static struct  {
     uint8_t range;
     __code const char *name;    
 } __code ranges[] = {
-    { MR_Batt,       "Range: Battery" },
-    { MR_Temp,       "Range: Temperature" },
-    { MR_15V,        "Range: 15V" },
-    { MR_2V_52mA,    "Range: 2V / 52mA" },
-    { MR_200mV_20mA, "Range:200mV/20mA" },
-    { MR_Int_x0_2,   "Range: Int * 0.2" },
-    { MR_Int_x2,     "Range: Int * 2.0" },
-    { MR_Int_x6,     "Range: Int * 6.0" },
-    { MR_GND,        "Range: GND" },
-    { MR_GND_x10,    "Range: GND * 10" },
-    { MR_GND_x30,    "Range: GND * 30" },
+    { MR_Batt,          "Range: Battery" },
+    { MR_Temp,          "Range: Temperatu" },
+    { MR_42V,           "Range: 42V" },
+    { MR_15V,           "Range: 15V" },
+    { MR_2V_52mA,       "Range: 2V / 52mA" },
+    { MR_200mV_20mA,    "Range:200mV/20mA" },
+    { MR_42V | MR_x3,   "Range: 42V * 3" },
+    { MR_15V | MR_x3,   "Range: 15V * 3" },
+    { MR_2V_52mA|MR_x3, "Range: 2V/52mA*3" },
+    { MR_66mV_6_6mA,    "Range: 66mV/6mA" },
+    { MR_GND,           "Range: GND" },
+    { MR_GND | MR_x3,   "Range: GND * 3" },
+    { MR_GND_x10,       "Range: GND * 10" },
+    { MR_GND_x30,       "Range: GND * 30" },
+    { MR_Int_x0_2,      "Range: Int * 0.2" },
+    { MR_Int_x2,        "Range: Int * 2.0" },
+    { MR_Int_x6,        "Range: Int * 6.0" },
 };
 
 static uint8_t range_idx;

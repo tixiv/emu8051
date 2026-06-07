@@ -2,14 +2,14 @@
 #include "menu.h"
 
 typedef struct {
-    __code menu_t * menu;
-     uint8_t index;
+    const menu_t * menu;
+    uint8_t index;
 } menu_stack_t;
 
-static menu_stack_t menu_stack[3];
+static menu_stack_t menu_stack[4];
 static uint8_t menu_sp;
 
-static __code menu_t *current_menu;
+static const menu_t *current_menu;
 static uint8_t current_index;
 
 void redraw_menu(void) {
@@ -17,14 +17,14 @@ void redraw_menu(void) {
     display_string(1, current_menu->entries[current_index].name);
 }
 
-void menu_init(__code const menu_t *root_menu) {
+void menu_init(const menu_t *root_menu) {
     current_menu = root_menu;
     current_index = 0;
     menu_sp = 0;
     redraw_menu();
 }
 
-void enter_sub_menu(__code const menu_t *menu) {
+void enter_sub_menu(const menu_t *menu) {
     menu_stack[menu_sp].menu = current_menu;
     menu_stack[menu_sp].index = current_index;
     menu_sp++;
@@ -52,7 +52,7 @@ uint8_t update_menu(void) {
             redraw_menu();
         } break;
         case KEY_ENTER: {
-            current_menu->entries[current_index].handler();
+            current_menu->entries[current_index].handler(current_index);
         } break;
         case KEY_ESC: {
             exit_sub_menu();

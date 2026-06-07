@@ -3,7 +3,7 @@
 #include "keyboard.h"
 #include <stdint.h>
 
-typedef void(*handler_t)(void) ;
+typedef void(*handler_t)(uint8_t) ;
 
 typedef struct {
     __code const char *name;
@@ -16,8 +16,8 @@ typedef struct {
     menu_entry_t entries[];
 } menu_t;
 
-void menu_init(__code const menu_t *root_menu);
-void enter_sub_menu(__code const menu_t *menu);
+void menu_init(const menu_t *root_menu);
+void enter_sub_menu(const menu_t *menu);
 void redraw_menu(void);
 
 uint8_t update_menu(void);

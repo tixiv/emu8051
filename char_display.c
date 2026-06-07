@@ -21,7 +21,6 @@ void display_init(struct display_t *disp) {
     busy_37us = 37 * opt_clock_hz / 12000000;
 }
 
-
 // Takes data and control line states, returns data state for reads
 // control.7 = EN
 // control.6 = RS
@@ -251,37 +250,38 @@ uint8_t display_tick(struct display_t *disp, uint8_t data, uint8_t control)
     return pout;
 }
 
+static void print_row(struct display_t *disp, int row) {
+	mvprintw(2 + row, 40, "[");
+	for (int i = 0; i < 16; i++)
+	{
+		int c = disp->ram[(i + disp->ofs + 0x40 * row) & 0x7f];
+		if ((disp->dcb & 4) == 0) c = ' ';
+
+        if (c == 0xdf) {
+            printw("°");
+        }
+        else if (c == 0xf4) {
+            printw("Ω");
+        }
+        else if (c < 16) {
+            printw("~");
+        }
+        else if (c < 32 || c > 126) {
+            printw("?");
+        }
+        else {
+			printw("%c", c);
+        }
+	}
+	printw("]");
+}
+
 void display_render(struct display_t *disp)
 {
-	int i;	
-	mvprintw(2, 40, "[");
-	for (i = 0; i < 16; i++)
-	{
-		int c = disp->ram[(i + disp->ofs) & 0x7f];
-		if ((disp->dcb & 4) == 0) c = ' ';
-		if (c == 0) c = ' ';		
-		if (c < 32 || c > 126)
-			c = '?';
-		printw("%c", c);
-	}
-	printw("]");
-
-	mvprintw(3, 40, "[");
-	for (i = 0; i < 16; i++)
-	{
-		int c = disp->ram[(i + disp->ofs + 0x40) & 0x7f];
-		if ((disp->dcb & 4) == 0) c = ' ';
-		if (c == 0) c = ' ';
-		if (c < 32 || c > 126)
-			c = '?';
-		printw("%c", c);
-	}
-	printw("]");
-
+    print_row(disp,0);
+    print_row(disp,1);
 	
 	mvprintw(4, 40, "Display %3s, Cursor %3s", (disp->dcb & 4)?"on":"off", (disp->dcb & 2)?"on":"off");
 	mvprintw(5, 40, "Blinking %3s, 4bit %3s", (disp->dcb & 1)?"on":"off", (disp->_4bmode & 1)?"on":"off");
 	mvprintw(6, 40, "4b tick:%d Busy:%-7d", disp->tick, disp->busy);
-
-	
 }

@@ -12,7 +12,7 @@
 // "  0.123\0"
 static char buffer[8];
 
-void print_number(int16_t value, uint8_t dp) {
+void print_number_cropped(int16_t value, uint8_t dp, uint8_t crop, uint8_t minus) {
     memset(buffer, 0, 8);
     __itoa(value, buffer, 10);
 
@@ -28,7 +28,7 @@ void print_number(int16_t value, uint8_t dp) {
         }
     }
 
-    while (o > 0) {
+    while (o > crop) {
         if (dp == o) {
             buffer[o--] = '.';
         }
@@ -41,11 +41,14 @@ void print_number(int16_t value, uint8_t dp) {
     }
 
     if (i == 0xff)
-        buffer[0] = ' ';
+        buffer[crop] = ' ';
     else
-        buffer[0] = '-';
+        buffer[crop] = '-';
 
 
-    display_print(buffer);
-    display_put_char(' ');
+    display_print(buffer + crop + (minus ? 0:1));
+}
+
+void print_number(int16_t value, uint8_t dp) {
+    print_number_cropped(value, dp, 0, 1);
 }

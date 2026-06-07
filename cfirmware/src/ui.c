@@ -1,4 +1,5 @@
 
+#include "ui.h"
 #include "print_number.h"
 #include "keyboard.h"
 #include "display.h"
@@ -11,21 +12,17 @@
 #include "source.h"
 #include "menu.h"
 #include "measure_screen.h"
+#include "thermocouple.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <8051.h>
 
+uint8_t current_mode;
 uint8_t current_screen;
-enum Screen {
-    SCR_MENU = 0,
-    SCR_SOURCE = 1,
-    SCR_TESTS  = 2,
-    SCR_NUMERIC_ENTRY = 3,
-    SCR_MEASURE = 4,
-};
 
 uint8_t ui_current_range;
+uint8_t allow_measure_screen_exit;
 
 typedef struct {
     uint8_t str_title;
@@ -35,6 +32,22 @@ typedef struct {
     float   multiplier;
     uint8_t dp;
 } ui_range_t;
+
+__code measure_screen_t measure_screen_mA = {
+    2, {
+        {0x70, -4, MR_2V_52mA},
+        {0x6f, -3, MR_200mV_20mA},
+    }
+};
+
+__code measure_screen_t measure_screen_V = {
+    4, {
+        {0x13, 4, MR_42V},
+        {0x9b, 3, MR_15V},
+        {0x9a, 2, MR_2V_52mA},
+        {0x99, 4, MR_200mV_20mA},
+    }
+};
 
 __code ui_range_t ranges[] = {
     {0xa5, 0x38, 0x39, MR_15V,        10.0f,  3},
@@ -89,52 +102,43 @@ uint8_t update_source_screen(void) {
     return 0;
 }
 
-void enter_volt_source_15V(void) {
-    ui_current_range = 0;
+void enter_volt_source(uint8_t entry) {
+    ui_current_range = entry;
     enter_source();
 }
 
-void enter_volt_source_2V(void) {
-    ui_current_range = 1;
-    enter_source();
-}
-
-void enter_volt_source_200mV(void) {
-    ui_current_range = 2;
-    enter_source();
-}
-
-void enter_current_source_52ma(void) {
-    ui_current_range = 3;
-    enter_source();
-}
-
-void enter_current_source_20ma(void) {
-    ui_current_range = 4;
+void enter_current_source(uint8_t entry) {
+    ui_current_range = entry + 3;
     enter_source();
 }
 
 __code menu_t sub_menu_volt_source = {
     INT_STRING(0x91), 3, {
-        {INT_STRING(0x9b), enter_volt_source_15V},
-        {INT_STRING(0x9a), enter_volt_source_2V},
-        {INT_STRING(0x99), enter_volt_source_200mV},
+        {INT_STRING(0x9b), enter_volt_source},
+        {INT_STRING(0x9a), enter_volt_source},
+        {INT_STRING(0x99), enter_volt_source},
     }
 };
 
-void menu_entry_volt_source(void) {
+void menu_entry_volt_source(uint8_t entry) {
+    (void) entry;
     enter_sub_menu(&sub_menu_volt_source);
 }
 
-void menu_entry_tc_source(void) {
-
+void menu_entry_volt_measure(uint8_t entry) {
+    (void) entry;
+    measure_screen_set(&measure_screen_V);
+    allow_measure_screen_exit = 1;
+    current_screen = SCR_MEASURE;
 }
 
-void menu_entry_tests(void) {
+void menu_entry_tests(uint8_t entry) {
+    (void) entry;
     current_screen = SCR_TESTS;
 }
 
-void original_firmware(void) {
+void original_firmware(uint8_t entry) {
+    (void) entry;
     IE   = 0;
 	((void (*)(void))0xffe8)(); // jump to transition asm code
 }
@@ -153,26 +157,19 @@ __code menu_t main_menu_volt_source = {
 
 __code menu_t main_menu_current_source = {
     INT_STRING(0x69), 4, {
-        {INT_STRING(0x70), enter_current_source_52ma},
-        {INT_STRING(0x6f), enter_current_source_20ma},
+        {INT_STRING(0x70), enter_current_source},
+        {INT_STRING(0x6f), enter_current_source},
         {str_Tests, menu_entry_tests},
         {str_OrigFimrware, original_firmware}
     }
 };
 
-__code measure_screen_t measure_screen_mA = {
-    2, {
-        {0x70, -4, MR_2V_52mA},
-        {0x6f, -3, MR_200mV_20mA},
-    }
-};
-
-__code measure_screen_t measure_screen_V = {
-    4, {
-        {0x13, 4, MR_42V},
-        {0x9b, 3, MR_15V},
-        {0x9a, 2, MR_2V_52mA},
-        {0x99, 4, MR_200mV_20mA},
+__code menu_t main_menu_volt_measure = {
+    INT_STRING(0xe2), 4, {
+        {INT_STRING(0x67), menu_entry_volt_measure},
+        {INT_STRING(0x68), menu_entry_tc_measure},
+        {str_Tests, menu_entry_tests},
+        {str_OrigFimrware, original_firmware}
     }
 };
 
@@ -181,7 +178,15 @@ void return_to_menu(void) {
     redraw_menu();
 }
 
+uint8_t read_switch_posistion(void) {
+    return DAT_EXTMEM(0x9002) >> 4;
+}
+
 void update_ui(void) {
+    if (current_mode != read_switch_posistion()) {
+        source_stop();
+        init_ui();
+    }
     update_keyboard();
 
     switch (current_screen) {
@@ -204,25 +209,27 @@ void update_ui(void) {
         case SCR_SOURCE: {
              uint8_t res = update_source_screen();     
              if (res == KEY_ESC)
-                return_to_menu();       
+                return_to_menu();
         } break;
         case SCR_MEASURE: {
-            measure_screen_update();     
+            uint8_t res = measure_screen_update();
+            if (res && allow_measure_screen_exit)
+                return_to_menu();
+        } break;
+        case SCR_MEASURE_TC: {
+            uint8_t res = measure_tc_screen_update();
+            if (res)
+                return_to_menu();
         } break;
     }
 
     key_buffer = 0;
 }
 
-uint8_t switch_posistion;
-
-void update_switch_posistion(void) {
-    switch_posistion = DAT_EXTMEM(0x9002) >> 4;
-}
-
 void init_ui(void) {
-    update_switch_posistion();
-    switch (switch_posistion) {
+
+    current_mode = read_switch_posistion();
+    switch (current_mode) {
         default:
         case 0:
             menu_init(&main_menu_current_source);
@@ -234,11 +241,12 @@ void init_ui(void) {
             break;
         case 4:
             measure_screen_set(&measure_screen_mA);
+            allow_measure_screen_exit = 0;
             current_screen = SCR_MEASURE;
             break;
         case 5:
-            measure_screen_set(&measure_screen_V);
-            current_screen = SCR_MEASURE;
+            menu_init(&main_menu_volt_measure);
+            current_screen = SCR_MENU;
             break;
     }
 }
