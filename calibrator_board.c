@@ -125,7 +125,7 @@ void calibrator_board_init() {
     plot_init(&board->plot);
     integrator_init(&board->integrator);
 
-    board->mode = 0;
+    board->mode = 5;
 
     board->logfile = fopen("log", "w");
 }

@@ -62,19 +62,17 @@ float calc_temperature_from_voltage(__code const thermocouple_table_t *table, fl
     return table_calc(table, 0, u);
 }
 
-uint8_t tc_type;
-uint8_t tc_char;
-uint8_t tc_ref;
+static uint8_t tc_type;
+static uint8_t tc_char;
+static uint8_t tc_ref;
 
+static void init_tc_measurement(void);
 
 void enter_thermocouple_ref(uint8_t entry) {
     tc_ref = entry;
     pop_menu_stack(); // ref menu
-    current_screen = SCR_MEASURE_TC;
-    display_indexed(0, 0xae);
-    display_set_cursor(0,4);
-    display_put_char(tc_char);
-    set_measure_range(MR_66mV_6_6mA);
+    // TODO: entry 2: input custom tmperature
+    init_tc_measurement();
 }
 
 menu_t sub_menu_thermocouple_ref = {
@@ -117,25 +115,109 @@ void menu_entry_tc_measure(uint8_t entry) {
     enter_sub_menu(&sub_menu_thermocouple_type);
 }
 
+
+static struct {
+    float measure_akk;
+    float ref_temp_akk;
+    float ref_temp;
+    float gnd_akk;
+    float cold_junction_mV;
+} tc_state;
+
+static uint8_t channel_idx;
+static uint8_t measure_init_countdown;
+
+static const float alpha = 0.1;
+static const float alpha_aux = 0.2;
+
+static void update_tc_measurement(void) {
+    
+    // rotate ranges: GND, TC, TC, TC LM35c, TC, TC, TC (repeat)
+    switch (channel_idx) {
+        case 0: set_measure_range(MR_GND_x30); break;
+        case 4: set_measure_range(MR_Temp); break;
+        default: set_measure_range(MR_66mV_6_6mA); break;
+    }
+
+    if (measure_init_countdown) {
+        switch (channel_idx) {
+            case 1: tc_state.gnd_akk = latest_measurement; break;
+            case 2: tc_state.measure_akk = latest_measurement; break;
+            case 5: tc_state.ref_temp_akk = latest_measurement; break;                
+        }
+        measure_init_countdown--;
+    }
+
+    switch (channel_idx) {
+        case 1:
+            tc_state.gnd_akk += alpha_aux * (latest_measurement - tc_state.gnd_akk);
+            break;
+
+        case 5:
+            tc_state.ref_temp_akk += alpha_aux * (latest_measurement - tc_state.ref_temp_akk);
+            switch (tc_ref){
+                case 0: tc_state.ref_temp = tc_state.ref_temp_akk; break;
+                case 1: tc_state.ref_temp = 0.0f; break;
+                case 2: tc_state.ref_temp = 0.5f; break;
+            }
+            tc_state.cold_junction_mV = calc_voltage_from_temperature(current_table,  tc_state.ref_temp * 100.0f);
+            break;
+
+        default:
+            tc_state.measure_akk += alpha * (latest_measurement - tc_state.measure_akk);
+            break;
+    }
+
+    if (measure_init_countdown < 3) {
+        if (channel_idx == 5) {
+
+            display_set_cursor(0,10);
+            print_number_cropped(tc_state.ref_temp * 1000.0f, 5, 2, 0);
+            display_print("\xdf" "C");
+        }
+        if (channel_idx == 0 || channel_idx == 4) {
+            display_set_cursor(1,0);
+            display_print("     ");
+
+            float millivolts = tc_state.measure_akk * (100.0f/3.0f);
+            millivolts += tc_state.cold_junction_mV;
+            float t = calc_temperature_from_voltage(current_table, millivolts);
+
+            print_number_cropped(t * 10.0f, 5, 0, 1);
+            display_print("\xdf" "C         ");
+        }
+    } else {
+            display_set_cursor(0,11);
+            display_print("--.-" "\xdf" "C");
+
+            display_set_cursor(1,0);
+            display_print("      --.-" "\xdf" "C         ");
+    }
+
+    channel_idx++;
+    channel_idx &= 0x07;
+}
+
+static void init_tc_measurement(void) {
+    set_measure_range(MR_GND_x30);
+
+    current_screen = SCR_MEASURE_TC;
+    display_indexed(0, 0xae);
+    display_set_cursor(0,4);
+    display_put_char(tc_char);
+
+    channel_idx = 0;
+    measure_init_countdown = 8;
+}
+
+
 uint8_t measure_tc_screen_update(void) {
+    update_tc_measurement();
+
     switch (key_buffer) {
         case KEY_ESC:
             return KEY_ESC;
     }
-
-    display_set_cursor(0,10);
-    print_number_cropped(173, 5, 2, 0);
-    display_print("\xdf" "C");
-
-    display_set_cursor(1,0);
-    display_print("     ");
-
-    float millivolts = latest_measurement * (100.0f/3.0f);
-    millivolts += calc_voltage_from_temperature(current_table,  17.3f);
-    float t = calc_temperature_from_voltage(current_table, millivolts);
-
-    print_number_cropped(t * 10.0f, 5, 0, 1);
-    display_print("\xdf" "C         ");
 
     return 0;
 }
