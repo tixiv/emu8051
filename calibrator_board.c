@@ -567,7 +567,7 @@ void trace_codemem_acces(struct em8051 *aCPU, uint16_t addr) {
 void trace_pc(struct em8051 *aCPU) {
     uint16_t pc = aCPU->mPC;
 
-    if (should_trace_math(get_caller(aCPU))) {
+    if (false && should_trace_math(get_caller(aCPU))) {
         switch (pc) {
             case 0xe00a: trace_math_op(aCPU); break;
             case 0x07c5: trace_fun762(aCPU); break;
@@ -575,36 +575,31 @@ void trace_pc(struct em8051 *aCPU) {
             case 0xdfce: trace_strore_fp_akk(aCPU); break;
             case 0xdfd9: trace_fp_mul(aCPU); break;
             case 0xdfcf: trace_fp_add(aCPU); break;
-
-            
-
-            
         }
     }
-    switch (pc) {
-        case 0x02a6: trace_polynom_calculation(aCPU); break;
-        case 0x0342: trace_polynom_calculation_exit(aCPU); break;
+    if (false) {
+        switch (pc) {
+            case 0x02a6: trace_polynom_calculation(aCPU); break;
+            case 0x0342: trace_polynom_calculation_exit(aCPU); break;
+        }
     }
 
 
-    if (0) {
+    if (false) {
         switch (pc) {
             case 0xddca: trace_multimeter_read(aCPU); break;
             case 0x06e8: trace_multimeter_read_and_convert(aCPU); break;
         }
+    }
 
-        bool my_code = true;
-        if (my_code) {
-            switch (pc) {
-                case 0xdb75: trace_msg("Multimeter read begin\n"); break;
-            }
-        } else {
-            switch (pc) {
-                case 0xdb82: trace_msg("Enable interrupt to read meter\n"); break;
-                case 0x17e2: trace_msg("ISR Quatsch loop begin\n"); break;
-                case 0x1812: trace_msg("ISR Quatsch loop end\n"); break;
-                case 0x182e: trace_msg("ISR Read digit %02x\n", aCPU->mSFR[REG_ACC]); break;
-            }
+    if (false) {
+        switch (pc) {
+            case 0xdb75: trace_msg("Multimeter read begin\n"); break;
+            case 0xdb82: trace_msg("Enable interrupt to read meter\n"); break;
+            case 0x17e2: trace_msg("ISR Quatsch loop begin\n"); break;
+            case 0x1812: trace_msg("ISR Quatsch loop end\n"); break;
+            case 0x182e: trace_msg("ISR Read digit %02x\n", aCPU->mSFR[REG_ACC]); break;
         }
     }
+    
 }

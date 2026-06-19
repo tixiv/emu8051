@@ -35,7 +35,6 @@ void int1_isr(void) __interrupt (2)
 static char buff[7]; // "-12345\x00"
 
 void read_multimeter_and_convert_result(void) {
-	TRACE(1);
 	while(multimeter_state != 6);
 
 	char *p = buff;

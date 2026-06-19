@@ -24,7 +24,8 @@ enum Screen {
     SCR_MENU = 0,
     SCR_SOURCE = 1,
     SCR_TESTS  = 2,
-    SCR_NUMERIC_ENTRY = 3,
-    SCR_MEASURE = 4,
-    SCR_MEASURE_TC = 5,
+    SCR_MULTIMETER_TEST  = 3,
+    SCR_NUMERIC_ENTRY = 4,
+    SCR_MEASURE = 5,
+    SCR_MEASURE_TC = 6,
 };

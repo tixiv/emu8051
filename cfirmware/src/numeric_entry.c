@@ -2,23 +2,26 @@
 #include "numeric_entry.h"
 #include "keyboard.h"
 #include "display.h"
+#include "ui.h"
 #include <stdlib.h>
-
-float numeric_entry_value;
 
 static uint8_t pos = 0;
 static char buffer[8];
 
 static const uint8_t offset = 8;
 
-void numeric_entry_init(void) {
+static numeric_entry_handler_t current_handler;
+
+void numeric_entry_init(numeric_entry_handler_t handler) {
+    current_handler = handler;
+    current_screen = SCR_NUMERIC_ENTRY;
     display_set_cursor(0, offset);
     display_put_char('?');
 
     pos = 0;
 }
 
-uint8_t numeric_entry_update(void) {
+void numeric_entry_update(void) {
     if (key_buffer) {
         if ((key_buffer & 0x30) && pos < 6) {
             display_set_cursor(0, offset + pos);
@@ -33,14 +36,13 @@ uint8_t numeric_entry_update(void) {
                 display_put_char(' ');
             }
             else {
-                return KEY_ESC;
+                current_handler(0.0f, NES_CANCEL);
             }
         }
         if (key_buffer == KEY_ENTER) {
             buffer[pos] = 0;
-            numeric_entry_value = atof(buffer);
-            return KEY_ENTER;
+            float value = atof(buffer);
+            current_handler(value, NES_OKAY);
         }
     }
-    return 0;
 }

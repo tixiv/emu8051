@@ -6,3 +6,4 @@ void display_put_char(char c);
 void display_set_cursor(uint8_t row, uint8_t col);
 void display_print(const char *str);
 void display_print_16(const char *str);
+void display_clear_row(uint8_t row);

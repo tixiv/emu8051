@@ -1,3 +1,3 @@
 
 
-#define TRACE_MULTIMETER false
+#define TRACE_MULTIMETER true

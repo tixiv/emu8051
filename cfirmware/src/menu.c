@@ -33,13 +33,17 @@ void enter_sub_menu(const menu_t *menu) {
     redraw_menu();
 }
 
-static void exit_sub_menu(void) {
+void pop_menu_stack(void) {
     if (menu_sp) {
         menu_sp--;
         current_menu = menu_stack[menu_sp].menu;
         current_index = menu_stack[menu_sp].index;
-        redraw_menu();
     }
+}
+
+static void exit_sub_menu(void) {
+    pop_menu_stack();
+    redraw_menu();
 }
 
 uint8_t update_menu(void) {

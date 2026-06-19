@@ -96,3 +96,11 @@ void display_print_16(const char *str) {
         display_put_char(c);
     }
 }
+
+void display_clear_row(uint8_t row) {
+    display_set_cursor(row, 0);
+    uint8_t i = 16;
+    while (i--) {
+        display_put_char(' ');
+    }
+}

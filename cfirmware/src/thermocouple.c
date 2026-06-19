@@ -69,6 +69,7 @@ uint8_t tc_ref;
 
 void enter_thermocouple_ref(uint8_t entry) {
     tc_ref = entry;
+    pop_menu_stack(); // ref menu
     current_screen = SCR_MEASURE_TC;
     display_indexed(0, 0xae);
     display_set_cursor(0,4);

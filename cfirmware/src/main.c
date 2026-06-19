@@ -47,8 +47,11 @@ int main(void) {
 	init_ui();
 
 	while (1) {
+		TRACE(1);
 		read_multimeter_and_convert_result();
+		TRACE(2);
 		source_update();
+		TRACE(3);
 		update_ui();
 	}
 }

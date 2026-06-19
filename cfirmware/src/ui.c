@@ -24,6 +24,11 @@ uint8_t current_screen;
 uint8_t ui_current_range;
 uint8_t allow_measure_screen_exit;
 
+void return_to_menu(void) {
+    current_screen = SCR_MENU;
+    redraw_menu();
+}
+
 typedef struct {
     uint8_t str_title;
     uint8_t str_entry_0;
@@ -57,14 +62,32 @@ __code ui_range_t ranges[] = {
     {0x76, 0x2c, 0x2d, MR_200mV_20mA, 10.0f,  3},
 };
 
-void enter_source_numeric_entry(void) {
-    display_indexed(0, ranges[ui_current_range].str_entry_0);
-    display_indexed(1, ranges[ui_current_range].str_entry_1);
-    current_screen = SCR_NUMERIC_ENTRY;
-    numeric_entry_init();
+float val_to_hw;
+
+static void exit_source(void) {
+    set_measure_range(MR_Int_x0_2);
+    source_target = 0.0f;
 }
 
-float val_to_hw;
+
+static void numeric_entry_done(float value, uint8_t status) __reentrant {
+    if (status == NES_OKAY) {
+        set_measure_range(ranges[ui_current_range].range);
+        source_target = value * val_to_hw;
+        source_start();
+        current_screen = SCR_SOURCE;
+    }
+    else {
+        exit_source();
+        return_to_menu();
+    }
+}
+
+static void enter_source_numeric_entry(void) {
+    display_indexed(0, ranges[ui_current_range].str_entry_0);
+    display_indexed(1, ranges[ui_current_range].str_entry_1);
+    numeric_entry_init(numeric_entry_done);
+}
 
 void enter_source(void) {
     val_to_hw = 1.0f / ranges[ui_current_range].multiplier;
@@ -72,18 +95,10 @@ void enter_source(void) {
     enter_source_numeric_entry();
 }
 
-void numeric_entry_enter_pressed(void) {
-    set_measure_range(ranges[ui_current_range].range);
-    source_target = numeric_entry_value * val_to_hw;
-    source_start();
-    current_screen = SCR_SOURCE;
-}
-
 uint8_t update_source_screen(void) {
     switch (key_buffer) {
         case KEY_ESC :
-            set_measure_range(MR_Int_x0_2);
-            source_target = 0.0f;
+            exit_source();
             return KEY_ESC;
         case 0: break;
     
@@ -132,9 +147,31 @@ void menu_entry_volt_measure(uint8_t entry) {
     current_screen = SCR_MEASURE;
 }
 
+void menu_entry_test(uint8_t entry) {
+    switch (entry) {
+        case 0:
+            current_screen = SCR_TESTS;
+            display_clear_row(0);
+            display_clear_row(1);
+            break;
+        case 1: 
+            current_screen = SCR_MULTIMETER_TEST;
+            multimeter_test_init();
+        break;
+    }
+}
+
+__code menu_t sub_menu_tests = {
+    "Tests", 2, {
+        {"Range/Integrator", menu_entry_test},
+        {"Meter timing", menu_entry_test},
+    }
+};
+
+
 void menu_entry_tests(uint8_t entry) {
     (void) entry;
-    current_screen = SCR_TESTS;
+    enter_sub_menu(&sub_menu_tests);
 }
 
 void original_firmware(uint8_t entry) {
@@ -173,11 +210,6 @@ __code menu_t main_menu_volt_measure = {
     }
 };
 
-void return_to_menu(void) {
-    current_screen = SCR_MENU;
-    redraw_menu();
-}
-
 uint8_t read_switch_posistion(void) {
     return DAT_EXTMEM(0x9002) >> 4;
 }
@@ -198,13 +230,13 @@ void update_ui(void) {
             if (res)
                 return_to_menu();
         } break;
-        case SCR_NUMERIC_ENTRY: {
-            uint8_t res = numeric_entry_update();
-            if (res == KEY_ESC)
+        case SCR_MULTIMETER_TEST: {
+            uint8_t res = multimeter_test_screen_update();
+            if (res)
                 return_to_menu();
-            if (res == KEY_ENTER)
-                numeric_entry_enter_pressed();
-            
+        } break;
+        case SCR_NUMERIC_ENTRY: {
+            numeric_entry_update();            
         } break;
         case SCR_SOURCE: {
              uint8_t res = update_source_screen();     

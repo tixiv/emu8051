@@ -18,6 +18,7 @@ typedef struct {
 
 void menu_init(const menu_t *root_menu);
 void enter_sub_menu(const menu_t *menu);
+void pop_menu_stack(void);
 void redraw_menu(void);
 
 uint8_t update_menu(void);
